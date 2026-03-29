@@ -16,7 +16,7 @@ source .venv/bin/activate
 
 # Install dependencies
 pip install "tinker-cookbook @ git+https://github.com/thinking-machines-lab/tinker-cookbook.git"
-pip install inspect_evals
+pip install inspect_ai==0.3.170 inspect_evals==0.3.106
 pip install "git+https://github.com/josejg/instruction_following_eval"
 
 # Set your Tinker API key
