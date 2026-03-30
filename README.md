@@ -14,10 +14,13 @@ For project requirements, grading breakdown, deliverables, and policies, see [`P
 uv venv --python 3.11
 source .venv/bin/activate
 
-# Install dependencies
-pip install "tinker-cookbook @ git+https://github.com/thinking-machines-lab/tinker-cookbook.git"
-pip install inspect_ai==0.3.170 inspect_evals==0.3.106
-pip install "git+https://github.com/josejg/instruction_following_eval"
+# Install dependencies (option A: from requirements.txt)
+uv pip install -r requirements.txt
+
+# Or install manually (option B):
+# uv pip install "tinker-cookbook @ git+https://github.com/thinking-machines-lab/tinker-cookbook.git"
+# uv pip install inspect_ai==0.3.170 inspect_evals==0.3.106 openai
+# uv pip install "git+https://github.com/josejg/instruction_following_eval"
 
 # Set your Tinker API key
 export TINKER_API_KEY="your-api-key-here"
