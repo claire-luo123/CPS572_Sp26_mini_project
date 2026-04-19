@@ -1,0 +1,53 @@
+{
+  "type": "baseline",
+  "models": {
+    "meta-llama/Llama-3.2-3B": {
+      "google/IFEval/prompt_strict_acc": 0.15711645101663585,
+      "google/IFEval/prompt_strict_stderr": 0.01566021568347361,
+      "google/IFEval/prompt_loose_acc": 0.1756007393715342,
+      "google/IFEval/prompt_loose_stderr": 0.01637325731205799,
+      "google/IFEval/inst_strict_acc": 0.2709832134292566,
+      "google/IFEval/inst_strict_stderr": 0.015538929162378125,
+      "google/IFEval/inst_loose_acc": 0.2973621103117506,
+      "google/IFEval/inst_loose_stderr": 0.016092592051536316,
+      "google/IFEval/final_acc": 0.22526562853229432,
+      "google/IFEval/final_stderr": 0.014548472251070803,
+      "openai/gsm8k/accuracy": 0.09704321455648218,
+      "openai/gsm8k/stderr": 0.00815376827455466,
+      "openai/openai_humaneval/accuracy": 0.0,
+      "openai/openai_humaneval/stderr": 0.0
+    },
+    "meta-llama/Llama-3.2-1B": {
+      "google/IFEval/prompt_strict_acc": 0.14048059149722736,
+      "google/IFEval/prompt_strict_stderr": 0.014953371656822667,
+      "google/IFEval/prompt_loose_acc": 0.16266173752310537,
+      "google/IFEval/prompt_loose_stderr": 0.0158816745472322,
+      "google/IFEval/inst_strict_acc": 0.2745803357314149,
+      "google/IFEval/inst_strict_stderr": 0.015472025842088583,
+      "google/IFEval/inst_loose_acc": 0.302158273381295,
+      "google/IFEval/inst_loose_stderr": 0.016227818543745137,
+      "google/IFEval/final_acc": 0.21997023453326064,
+      "google/IFEval/final_stderr": 0.01403082942584698,
+      "openai/gsm8k/accuracy": 0.02122820318423048,
+      "openai/gsm8k/stderr": 0.003970449129848645,
+      "openai/openai_humaneval/accuracy": 0.0,
+      "openai/openai_humaneval/stderr": 0.0
+    },
+    "meta-llama/Llama-3.1-8B": {
+      "google/IFEval/prompt_strict_acc": 0.1589648798521257,
+      "google/IFEval/prompt_strict_stderr": 0.015734783762341276,
+      "google/IFEval/prompt_loose_acc": 0.18484288354898337,
+      "google/IFEval/prompt_loose_stderr": 0.01670417955850395,
+      "google/IFEval/inst_strict_acc": 0.2685851318944844,
+      "google/IFEval/inst_strict_stderr": 0.015397612417049733,
+      "google/IFEval/inst_loose_acc": 0.2949640287769784,
+      "google/IFEval/inst_loose_stderr": 0.01608415147462376,
+      "google/IFEval/final_acc": 0.22683923101814296,
+      "google/IFEval/final_stderr": 0.014682215308199895,
+      "openai/gsm8k/accuracy": 0.09855951478392722,
+      "openai/gsm8k/stderr": 0.008210320350946265,
+      "openai/openai_humaneval/accuracy": 0.0,
+      "openai/openai_humaneval/stderr": 0.0
+    }
+  }
+}

@@ -33,50 +33,15 @@ MODEL = "meta-llama/Llama-3.2-3B"
 
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# TODO: TOY DATA, replace with your own training data
-DEMO_CONVERSATIONS = [
-    [
-        {"role": "user", "content": "What is 15 + 27?"},
-        {"role": "assistant", "content": "15 + 27 = 42"},
-    ],
-    [
-        {"role": "user", "content": "What is the capital of France?"},
-        {"role": "assistant", "content": "The capital of France is Paris."},
-    ],
-    [
-        {"role": "user", "content": "Write a Python function that returns the sum of two numbers."},
-        {"role": "assistant", "content": "def add(a, b):\n    return a + b"},
-    ],
-    [
-        {"role": "user", "content": "What is 8 * 7?"},
-        {"role": "assistant", "content": "8 * 7 = 56"},
-    ],
-    [
-        {"role": "user", "content": "Translate 'hello' to Spanish."},
-        {"role": "assistant", "content": "Hola"},
-    ],
-    [
-        {"role": "user", "content": "What is the square root of 144?"},
-        {"role": "assistant", "content": "The square root of 144 is 12."},
-    ],
-    [
-        {"role": "user", "content": "Write a Python function to check if a number is even."},
-        {"role": "assistant", "content": "def is_even(n):\n    return n % 2 == 0"},
-    ],
-    [
-        {"role": "user", "content": "List the first 5 prime numbers."},
-        {"role": "assistant", "content": "The first 5 prime numbers are: 2, 3, 5, 7, 11."},
-    ],
-]
-
 
 def main():
     parser = argparse.ArgumentParser(description="Train, save, and publish a checkpoint")
-    parser.add_argument("--num_steps", type=int, default=10, help="Number of training steps")
+    # Increased default steps from 10 to 250 for a more realistic test run
+    parser.add_argument("--num_steps", type=int, default=250, help="Number of training steps")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--rank", type=int, default=32, help="LoRA rank")
-    parser.add_argument("--checkpoint_name", type=str, default="demo", help="Checkpoint name")
+    parser.add_argument("--checkpoint_name", type=str, default="mixed_sft_v1", help="Checkpoint name")
     parser.add_argument("--no_publish", action="store_true", help="Skip publishing")
     args = parser.parse_args()
 
@@ -87,15 +52,45 @@ def main():
     renderer = renderers.get_renderer(renderer_name, tokenizer)
     print(f"Renderer: {renderer_name}")
 
+    # Load custom training data
+    print("Loading custom training data from JSONL...")
+    all_conversations = []
+    
+    # Update this path if your jsonl file is named differently!
+    data_path = os.path.join(EVAL_DIR, "..", "data", "my_mixed_training_data.jsonl") 
+    
+    with open(data_path, "r") as f:
+        for line in f:
+            row = json.loads(line)
+            # Map GSM8K format
+            if "question" in row and "answer" in row:
+                all_conversations.append([
+                    {"role": "user", "content": row["question"]},
+                    {"role": "assistant", "content": row["answer"]}
+                ])
+            # Map Tulu format
+            elif "messages" in row:
+                all_conversations.append(row["messages"])
+            # Map Code format (Instruction/Output)
+            elif "instruction" in row and "output" in row:
+                all_conversations.append([
+                    {"role": "user", "content": row["instruction"]},
+                    {"role": "assistant", "content": row["output"]}
+                ])
+
     # Prepare training data
-    print("Preparing training data...")
+    print("Tokenizing training data...")
     all_data = []
-    for convo in DEMO_CONVERSATIONS:
-        datum = conversation_to_datum(
-            convo, renderer, max_length=512, train_on_what=renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES
-        )
-        all_data.append(datum)
-    print(f"  {len(all_data)} training examples prepared")
+    for convo in all_conversations:
+        try:
+            datum = conversation_to_datum(
+                convo, renderer, max_length=512, train_on_what=renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES
+            )
+            all_data.append(datum)
+        except Exception as e:
+            continue # Skip any malformed data rows
+            
+    print(f"  {len(all_data)} training examples prepared and tokenized!")
 
     # Create training client
     print(f"Creating LoRA training client (rank={args.rank})...")
@@ -122,7 +117,10 @@ def main():
         logprobs = np.concatenate([o["logprobs"].tolist() for o in fwd_bwd_result.loss_fn_outputs])
         weights = np.concatenate([d.loss_fn_inputs["weights"].tolist() for d in batch])
         loss = -np.dot(logprobs, weights) / max(weights.sum(), 1)
-        print(f"  Step {step+1}/{args.num_steps} | Loss: {loss:.4f}")
+        
+        # Only print every 10 steps so it doesn't spam your terminal
+        if step % 10 == 0 or step == args.num_steps - 1:
+            print(f"  Step {step+1}/{args.num_steps} | Loss: {loss:.4f}")
 
     # Save checkpoint
     print(f"\nSaving checkpoint '{args.checkpoint_name}'...")
@@ -157,8 +155,7 @@ def main():
         json.dump(info, f, indent=2)
     print(f"\nCheckpoint info saved to {info_path}")
     print(f"\nNext: evaluate your checkpoint with")
-    print(f"  python -m evaluation.eval_all --checkpoint_path \"{checkpoint_path}\" --base_model {MODEL}")
-
+    print(f"  PYTHONPATH=. python evaluation/eval_all.py --checkpoint_path \"{checkpoint_path}\" --base_model {MODEL}")
 
 if __name__ == "__main__":
     main()
