@@ -17,13 +17,17 @@ import asyncio
 import json
 import logging
 import os
+import sys
+
+EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.dirname(EVAL_DIR)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from tinker_cookbook.model_info import get_recommended_renderer_name
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 async def run_core(base_model, checkpoint_path, renderer_name, temperature,
                    top_p, limit, log_dir, verbose):

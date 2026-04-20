@@ -27,21 +27,24 @@ from tinker_cookbook import model_info, renderers
 from tinker_cookbook.supervised.data import conversation_to_datum
 from tinker_cookbook.tokenizer_utils import get_tokenizer
 
-MODEL = "meta-llama/Llama-3.2-3B"
-# MODEL = "meta-llama/Llama-3.2-1B"    # Smaller, faster for development
+# Default to 1B for cheaper iteration; switch to 3B/8B when recipe stabilizes.
+MODEL = "meta-llama/Llama-3.2-1B"
+# MODEL = "meta-llama/Llama-3.2-3B"
 # MODEL = "meta-llama/Llama-3.1-8B"    # Recommended for final submission
+
+# Longer contexts help code / long IF rows; raise carefully if you hit memory limits.
+MAX_SEQ_LEN = 1024
 
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def main():
     parser = argparse.ArgumentParser(description="Train, save, and publish a checkpoint")
-    # Increased default steps from 10 to 250 for a more realistic test run
-    parser.add_argument("--num_steps", type=int, default=250, help="Number of training steps")
+    parser.add_argument("--num_steps", type=int, default=2000, help="Number of training steps")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--rank", type=int, default=32, help="LoRA rank")
-    parser.add_argument("--checkpoint_name", type=str, default="mixed_sft_v1", help="Checkpoint name")
+    parser.add_argument("--checkpoint_name", type=str, default="mixed_sft_1b", help="Checkpoint name")
     parser.add_argument("--no_publish", action="store_true", help="Skip publishing")
     args = parser.parse_args()
 
@@ -79,12 +82,15 @@ def main():
                 ])
 
     # Prepare training data
-    print("Tokenizing training data...")
+    print(f"Tokenizing training data (max_length={MAX_SEQ_LEN})...")
     all_data = []
     for convo in all_conversations:
         try:
             datum = conversation_to_datum(
-                convo, renderer, max_length=512, train_on_what=renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES
+                convo,
+                renderer,
+                max_length=MAX_SEQ_LEN,
+                train_on_what=renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES,
             )
             all_data.append(datum)
         except Exception as e:
@@ -147,6 +153,7 @@ def main():
             "batch_size": args.batch_size,
             "learning_rate": args.lr,
             "lora_rank": args.rank,
+            "max_seq_len": MAX_SEQ_LEN,
         },
         "published": not args.no_publish,
     }
