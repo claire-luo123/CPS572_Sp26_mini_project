@@ -87,6 +87,7 @@ nvidia-nvjitlink==13.0.88
 nvidia-nvshmem-cu13==3.4.5
 nvidia-nvtx==13.0.85
 openai==2.30.0
+orjson==3.11.8
 packaging==26.0
 pandas==3.0.1
 pathlib-abc==0.5.2
