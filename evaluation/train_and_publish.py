@@ -17,8 +17,10 @@ Usage:
 """
 
 import argparse
+import asyncio
 import json
 import os
+from datetime import datetime
 
 import numpy as np
 import tinker
@@ -27,15 +29,65 @@ from tinker_cookbook import model_info, renderers
 from tinker_cookbook.supervised.data import conversation_to_datum
 from tinker_cookbook.tokenizer_utils import get_tokenizer
 
-# Default to 1B for cheaper iteration; switch to 3B/8B when recipe stabilizes.
-MODEL = "meta-llama/Llama-3.2-1B"
-# MODEL = "meta-llama/Llama-3.2-3B"
+# Default to 3B for stronger runs; switch back to 1B for cheaper iteration.
+# MODEL = "meta-llama/Llama-3.2-1B"
+MODEL = "meta-llama/Llama-3.2-3B"
 # MODEL = "meta-llama/Llama-3.1-8B"    # Recommended for final submission
 
 # Longer contexts help code / long IF rows; raise carefully if you hit memory limits.
 MAX_SEQ_LEN = 1024
 
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _pick_metric(metrics, preferred_substrings):
+    numeric_items = [(k, v) for k, v in metrics.items() if _is_number(v)]
+    if not numeric_items:
+        return None
+    for needle in preferred_substrings:
+        for key, value in numeric_items:
+            if needle in key.lower():
+                return float(value)
+    return float(numeric_items[0][1])
+
+
+def _extract_headline_scores(task_results):
+    ifeval_metrics = task_results.get("ifeval", {}).get("metrics", {})
+    gsm8k_metrics = task_results.get("gsm8k", {}).get("metrics", {})
+    humaneval_metrics = task_results.get("humaneval", {}).get("metrics", {})
+
+    return {
+        "ifeval_score": _pick_metric(
+            ifeval_metrics,
+            [
+                "prompt_level_strict",
+                "prompt_level_loose",
+                "inst_level_strict",
+                "inst_level_loose",
+                "accuracy",
+                "acc",
+            ],
+        ),
+        "gsm8k_accuracy": _pick_metric(gsm8k_metrics, ["accuracy", "acc", "exact_match", "correct"]),
+        "humaneval_score": _pick_metric(humaneval_metrics, ["pass@1", "accuracy", "acc", "correct"]),
+    }
+
+
+def _average_available(values):
+    present = [v for v in values if v is not None]
+    if not present:
+        return None
+    return float(sum(present) / len(present))
+
+
+def _format_score(value):
+    if value is None:
+        return "N/A"
+    return f"{value:.4f}"
 
 
 def main():
@@ -45,6 +97,24 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--rank", type=int, default=32, help="LoRA rank")
     parser.add_argument("--checkpoint_name", type=str, default="mixed_sft_1b", help="Checkpoint name")
+    parser.add_argument(
+        "--checkpoint_every",
+        type=int,
+        default=0,
+        help="Save intermediate checkpoint every N steps (0 disables periodic saves)",
+    )
+    parser.add_argument(
+        "--evaluate_top_k",
+        type=int,
+        default=3,
+        help="After training, evaluate top-K checkpoints by lowest train loss (0 disables)",
+    )
+    parser.add_argument(
+        "--eval_limit",
+        type=int,
+        default=30,
+        help="Sample limit per task for candidate checkpoint evaluation",
+    )
     parser.add_argument("--no_publish", action="store_true", help="Skip publishing")
     args = parser.parse_args()
 
@@ -107,6 +177,10 @@ def main():
     # Train
     adam_params = types.AdamParams(learning_rate=args.lr, beta1=0.9, beta2=0.95, eps=1e-8)
     print(f"\nTraining for {args.num_steps} steps (batch_size={args.batch_size}, lr={args.lr})...")
+    if args.checkpoint_every > 0:
+        print(f"Intermediate checkpoints enabled every {args.checkpoint_every} steps.")
+
+    checkpoints = []
 
     for step in range(args.num_steps):
         # Cycle through data
@@ -128,11 +202,117 @@ def main():
         if step % 10 == 0 or step == args.num_steps - 1:
             print(f"  Step {step+1}/{args.num_steps} | Loss: {loss:.4f}")
 
+        # Save periodic checkpoint if requested
+        step_num = step + 1
+        if args.checkpoint_every > 0 and step_num % args.checkpoint_every == 0:
+            periodic_name = f"{args.checkpoint_name}_step_{step_num}"
+            print(f"\nSaving periodic checkpoint '{periodic_name}'...")
+            ckpt = tc.save_weights_for_sampler(name=periodic_name).result()
+            periodic_path = ckpt.path
+            print(f"  Periodic checkpoint saved: {periodic_path}")
+            checkpoints.append(
+                {
+                    "name": periodic_name,
+                    "path": periodic_path,
+                    "step": step_num,
+                    "type": "periodic",
+                    "train_loss": float(loss),
+                }
+            )
+
     # Save checkpoint
     print(f"\nSaving checkpoint '{args.checkpoint_name}'...")
     ckpt = tc.save_weights_for_sampler(name=args.checkpoint_name).result()
     checkpoint_path = ckpt.path
     print(f"  Checkpoint saved: {checkpoint_path}")
+    checkpoints.append(
+        {
+            "name": args.checkpoint_name,
+            "path": checkpoint_path,
+            "step": args.num_steps,
+            "type": "final",
+            "train_loss": float(loss),
+        }
+    )
+
+    candidate_eval = None
+    if args.evaluate_top_k > 0:
+        from evaluation.eval_all import run_core
+
+        # Pick the lowest-loss checkpoints as candidates to evaluate on real tasks.
+        sorted_by_loss = sorted(
+            checkpoints,
+            key=lambda cp: cp.get("train_loss", float("inf")),
+        )
+        candidates = sorted_by_loss[: min(args.evaluate_top_k, len(sorted_by_loss))]
+        print("\nEvaluating candidate checkpoints...")
+        print(
+            "  Candidates (lowest train loss): "
+            + ", ".join(
+                f"{cp['name']}@{cp['step']} (loss={cp.get('train_loss', float('nan')):.4f})"
+                for cp in candidates
+            )
+        )
+
+        ranked_results = []
+        for cp in candidates:
+            print(f"\nRunning eval on candidate: {cp['name']} ({cp['path']})")
+            _, task_results = asyncio.run(
+                run_core(
+                    base_model=MODEL,
+                    checkpoint_path=cp["path"],
+                    renderer_name=renderer_name,
+                    temperature=0.0,
+                    top_p=1.0,
+                    limit=args.eval_limit,
+                    log_dir=None,
+                    verbose=False,
+                )
+            )
+            headline_scores = _extract_headline_scores(task_results)
+            avg_score = _average_available(
+                [
+                    headline_scores["ifeval_score"],
+                    headline_scores["gsm8k_accuracy"],
+                    headline_scores["humaneval_score"],
+                ]
+            )
+            ranked_results.append(
+                {
+                    "name": cp["name"],
+                    "path": cp["path"],
+                    "step": cp["step"],
+                    "train_loss": cp.get("train_loss"),
+                    "headline_scores": headline_scores,
+                    "average_score": avg_score,
+                }
+            )
+
+        ranked_results = sorted(
+            ranked_results,
+            key=lambda r: r["average_score"] if r["average_score"] is not None else -1.0,
+            reverse=True,
+        )
+
+        candidate_eval = {
+            "top_k": args.evaluate_top_k,
+            "eval_limit": args.eval_limit,
+            "candidates": [cp["name"] for cp in candidates],
+            "ranked_results": ranked_results,
+            "best_candidate": ranked_results[0] if ranked_results else None,
+        }
+
+        print("\nCandidate checkpoint ranking (higher is better):")
+        for i, row in enumerate(ranked_results, start=1):
+            scores = row["headline_scores"]
+            print(
+                f"  {i}. {row['name']} | avg={_format_score(row['average_score'])} "
+                f"| ifeval={_format_score(scores['ifeval_score'])} "
+                f"| gsm8k={_format_score(scores['gsm8k_accuracy'])} "
+                f"| humaneval={_format_score(scores['humaneval_score'])}"
+            )
+    else:
+        print("\nSkipping candidate checkpoint evaluation (--evaluate_top_k=0).")
 
     # Publish
     if not args.no_publish:
@@ -145,7 +325,9 @@ def main():
 
     # Save checkpoint info
     info = {
+        "created_at": datetime.utcnow().isoformat() + "Z",
         "checkpoint_path": checkpoint_path,
+        "checkpoints": checkpoints,
         "base_model": MODEL,
         "renderer_name": renderer_name,
         "training": {
@@ -154,7 +336,9 @@ def main():
             "learning_rate": args.lr,
             "lora_rank": args.rank,
             "max_seq_len": MAX_SEQ_LEN,
+            "checkpoint_every": args.checkpoint_every,
         },
+        "candidate_evaluation": candidate_eval,
         "published": not args.no_publish,
     }
     info_path = os.path.join(EVAL_DIR, "checkpoint_info.json")
