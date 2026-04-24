@@ -133,30 +133,6 @@ def average_available(values: List[Optional[float]]) -> Optional[float]:
     return float(sum(present) / len(present))
 
 
-def target_alignment_score(
-    headline_scores: Dict[str, Optional[float]], targets: Dict[str, float]
-) -> Optional[float]:
-    """
-    Score by progress toward target thresholds.
-    1.0 means meeting target; values above 1 are capped.
-    """
-    keys = [
-        ("ifeval_score", "ifeval"),
-        ("gsm8k_accuracy", "gsm8k"),
-        ("humaneval_score", "humaneval"),
-    ]
-    ratios = []
-    for score_key, target_key in keys:
-        score = headline_scores.get(score_key)
-        target = targets.get(target_key, 0.0)
-        if score is None or target <= 0:
-            continue
-        ratios.append(min(float(score) / float(target), 1.0))
-    if not ratios:
-        return None
-    return float(sum(ratios) / len(ratios))
-
-
 def format_score(value: Optional[float]) -> str:
     if value is None:
         return "N/A"
@@ -300,6 +276,8 @@ def extract_scores_from_task_results(task_results: Dict[str, Any]) -> Dict[str, 
 
 
 def main() -> None:
+    assert_eval_environment_ok()
+
     parser = argparse.ArgumentParser(description="One-command full training + evaluation pipeline")
     parser.add_argument(
         "--num_steps",
@@ -335,18 +313,6 @@ def main() -> None:
         default=1024,
         help="Passed to train_and_publish.py (1024 IF focus; 2048 longer code/context)",
     )
-    parser.add_argument("--weight_gsm8k", type=float, default=1.0)
-    parser.add_argument("--weight_ifeval", type=float, default=1.0)
-    parser.add_argument("--weight_code", type=float, default=1.0)
-    parser.add_argument("--max_gsm8k_examples", type=int, default=0, help="0 means no cap")
-    parser.add_argument("--max_ifeval_examples", type=int, default=0, help="0 means no cap")
-    parser.add_argument("--max_code_examples", type=int, default=0, help="0 means no cap")
-    parser.add_argument(
-        "--save_every_steps",
-        type=int,
-        default=0,
-        help="Optional extra compatibility checkpoint cadence used by search scripts",
-    )
     parser.add_argument(
         "--num_best_checkpoints",
         type=int,
@@ -378,9 +344,6 @@ def main() -> None:
     )
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top_p", type=float, default=1.0)
-    parser.add_argument("--target_ifeval", type=float, default=0.45)
-    parser.add_argument("--target_gsm8k", type=float, default=0.50)
-    parser.add_argument("--target_humaneval", type=float, default=0.30)
     parser.add_argument(
         "--output_dir",
         type=str,
@@ -393,14 +356,8 @@ def main() -> None:
         help="Publish only the selected best checkpoint at the end",
     )
     args = parser.parse_args()
-    assert_eval_environment_ok()
 
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    targets = {
-        "ifeval": args.target_ifeval,
-        "gsm8k": args.target_gsm8k,
-        "humaneval": args.target_humaneval,
-    }
     run_dir = (
         Path(args.output_dir).resolve()
         if args.output_dir
@@ -430,20 +387,9 @@ def main() -> None:
             str(args.checkpoint_every),
             "--max_seq_len",
             str(args.max_seq_len),
-            "--weight_gsm8k",
-            str(args.weight_gsm8k),
-            "--weight_ifeval",
-            str(args.weight_ifeval),
-            "--weight_code",
-            str(args.weight_code),
-            "--max_gsm8k_examples",
-            str(args.max_gsm8k_examples),
-            "--max_ifeval_examples",
-            str(args.max_ifeval_examples),
-            "--max_code_examples",
-            str(args.max_code_examples),
-            "--save_every_steps",
-            str(args.save_every_steps),
+            # This pipeline runs its own quick/full eval; skip train_and_publish's default top-3.
+            "--evaluate_top_k",
+            "0",
             "--model",
             args.model,
             "--no_publish",
@@ -514,7 +460,6 @@ def main() -> None:
                 headline_scores["humaneval_score"],
             ]
         )
-        target_score = target_alignment_score(headline_scores, targets)
         quick_results.append(
             {
                 "checkpoint_name": cp_name,
@@ -522,17 +467,13 @@ def main() -> None:
                 "step": cp.get("step"),
                 "headline_scores": headline_scores,
                 "average_score": avg_score,
-                "target_alignment_score": target_score,
                 "quick_submission_path": str(quick_out),
             }
         )
 
     ranked = sorted(
         quick_results,
-        key=lambda x: (
-            x["target_alignment_score"] if x["target_alignment_score"] is not None else -1.0,
-            x["average_score"] if x["average_score"] is not None else -1.0,
-        ),
+        key=lambda x: x["average_score"] if x["average_score"] is not None else -1.0,
         reverse=True,
     )
     num_best = max(1, min(args.num_best_checkpoints, len(ranked)))
@@ -577,10 +518,8 @@ def main() -> None:
                 "step": row["step"],
                 "quick_headline_scores": row["headline_scores"],
                 "quick_average_score": row["average_score"],
-                "quick_target_alignment_score": row["target_alignment_score"],
                 "full_submission_path": str(final_submission_path),
                 "full_headline_scores": full_scores,
-                "full_target_alignment_score": target_alignment_score(full_scores, targets),
                 "full_submission": full_submission,
             }
         )
@@ -603,10 +542,7 @@ def main() -> None:
 
     best_full = sorted(
         top_full_evaluations,
-        key=lambda r: (
-            r["full_target_alignment_score"] if r["full_target_alignment_score"] is not None else -1.0,
-            r["full_average_score"] if r["full_average_score"] is not None else -1.0,
-        ),
+        key=lambda r: r["full_average_score"] if r["full_average_score"] is not None else -1.0,
         reverse=True,
     )[0]
 
@@ -649,13 +585,6 @@ def main() -> None:
             "model_override": args.model,
             "train_data_path": args.train_data_path,
             "max_seq_len": args.max_seq_len,
-            "weight_gsm8k": args.weight_gsm8k,
-            "weight_ifeval": args.weight_ifeval,
-            "weight_code": args.weight_code,
-            "max_gsm8k_examples": args.max_gsm8k_examples,
-            "max_ifeval_examples": args.max_ifeval_examples,
-            "max_code_examples": args.max_code_examples,
-            "save_every_steps": args.save_every_steps,
             "num_steps": args.num_steps,
             "batch_size": args.batch_size,
             "lr": args.lr,
@@ -669,7 +598,6 @@ def main() -> None:
             "temperature": args.temperature,
             "top_p": args.top_p,
             "num_best_checkpoints": num_best,
-            "selection_targets": targets,
         },
         "baseline": {
             "metrics": baseline_metrics,
@@ -683,10 +611,8 @@ def main() -> None:
             "step": best_full["step"],
             "quick_headline_scores": best_full["quick_headline_scores"],
             "quick_average_score": best_full["quick_average_score"],
-            "quick_target_alignment_score": best_full["quick_target_alignment_score"],
             "full_headline_scores": best_full["full_headline_scores"],
             "full_average_score": best_full["full_average_score"],
-            "full_target_alignment_score": best_full["full_target_alignment_score"],
         },
         "top_full_evaluations": top_full_evaluations,
         "final_evaluation": {

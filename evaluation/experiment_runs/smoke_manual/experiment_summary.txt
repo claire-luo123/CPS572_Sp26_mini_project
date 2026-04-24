@@ -1,0 +1,29 @@
+EXPERIMENT SUMMARY
+Run timestamp (UTC): 2026-04-24T22:16:28.104239Z
+Base model: meta-llama/Llama-3.1-8B
+Training steps: 3
+Checkpoint cadence: every 0 steps
+
+Baseline scores:
+  IFEval:   0.3333
+  GSM8K:    0.0000
+  HumanEval:0.0000
+
+Best checkpoint:
+  Name: smoke_exp
+  Step: 3
+  Path: tinker://26dc0c0e-20b0-5f50-b824-681b88c2a88d:train:0/sampler_weights/smoke_exp
+
+Best checkpoint full-eval scores:
+  IFEval:   0.3333
+  GSM8K:    0.3333
+  HumanEval:0.0000
+
+Checkpoint candidates (quick eval):
+  - smoke_exp (step 3): IFEval=0.3333, GSM8K=0.3333, HumanEval=0.0000, Avg=0.2222
+
+Top checkpoint full-eval scores:
+  - smoke_exp (step 3): IFEval=0.3333, GSM8K=0.3333, HumanEval=0.0000
+
+Report JSON: /Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/evaluation/experiment_runs/smoke_manual/experiment_report.json
+Report Markdown: /Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/evaluation/experiment_runs/smoke_manual/experiment_report.md

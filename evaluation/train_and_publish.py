@@ -1,78 +1,49 @@
 """
-Train and optionally publish a LoRA checkpoint from mixed-task JSONL data.
+Train a model (minimal SFT), save checkpoint, and publish it.
 
-Responsibilities:
-1) Load mixed rows and map to task buckets (gsm8k / ifeval / code).
-2) Apply per-task caps and weighted task sampling during training.
-3) Save periodic + final checkpoints and checkpoint metadata.
-4) Optionally score top checkpoints on core eval tasks.
+NOTE: This is a TOY EXAMPLE that trains for a few steps on dummy data
+to verify the full workflow end-to-end. You should replace the training
+data and training logic with your own implementation.
+
+TODO:
+  - Replace DEMO_CONVERSATIONS with your task-specific training data
+  - Tune hyperparameters (learning rate, batch size, number of steps, LoRA rank)
+  - Add validation / early stopping as needed
+
+Usage:
+    python evaluation/train_and_publish.py
+    python evaluation/train_and_publish.py --num_steps 20
+    python evaluation/train_and_publish.py --no_publish   # skip publishing
 """
 
 import argparse
 import asyncio
-import importlib
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+import tinker
+from tinker import types
+from tinker_cookbook import model_info, renderers
+from tinker_cookbook.supervised.data import conversation_to_datum
+from tinker_cookbook.tokenizer_utils import get_tokenizer
 
+# Default submission model; override with --model.
 MODEL = "meta-llama/Llama-3.1-8B"
-DEFAULT_MAX_SEQ_LEN = 2048
+
+# Default max sequence length for tokenization (override with --max_seq_len).
+# Use 1024 for IF-heavy focus; 2048 if you need longer code / multi-turn contexts (more VRAM).
+DEFAULT_MAX_SEQ_LEN = 1024
+
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def _resolve_symbol(candidates: List[Tuple[str, str]]) -> Optional[Any]:
-    for module_name, attr_name in candidates:
-        try:
-            module = importlib.import_module(module_name)
-            value = getattr(module, attr_name, None)
-            if value is not None:
-                return value
-        except Exception:
-            continue
-    return None
-
-
-tinker = _resolve_symbol([("tinker", "ServiceClient")])
-types_mod = _resolve_symbol([("tinker", "types"), ("tinker.types", "AdamParams")])
-get_renderer_name = _resolve_symbol(
-    [
-        ("tinker_cookbook.model_info", "get_recommended_renderer_name"),
-    ]
-)
-get_renderer = _resolve_symbol(
-    [
-        ("tinker_cookbook.renderers", "get_renderer"),
-    ]
-)
-train_on_what = _resolve_symbol(
-    [
-        ("tinker_cookbook.renderers", "TrainOnWhat"),
-    ]
-)
-conversation_to_datum = _resolve_symbol(
-    [
-        ("tinker_cookbook.renderers", "conversation_to_datum"),
-        ("tinker_cookbook.training", "conversation_to_datum"),
-        ("tinker_cookbook.training_utils", "conversation_to_datum"),
-    ]
-)
-get_tokenizer = _resolve_symbol(
-    [
-        ("tinker_cookbook.renderers", "get_tokenizer"),
-        ("tinker_cookbook.training", "get_tokenizer"),
-        ("tinker_cookbook.training_utils", "get_tokenizer"),
-    ]
-)
-
-
-def _is_number(value: Any) -> bool:
+def _is_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _pick_metric(metrics: Dict[str, Any], preferred_substrings: List[str]) -> Optional[float]:
+def _pick_metric(metrics, preferred_substrings):
     numeric_items = [(k, v) for k, v in metrics.items() if _is_number(v)]
     if not numeric_items:
         return None
@@ -83,312 +54,273 @@ def _pick_metric(metrics: Dict[str, Any], preferred_substrings: List[str]) -> Op
     return float(numeric_items[0][1])
 
 
-def _extract_headline_scores(task_results: Dict[str, Any]) -> Dict[str, Optional[float]]:
+def _extract_headline_scores(task_results):
     ifeval_metrics = task_results.get("ifeval", {}).get("metrics", {})
     gsm8k_metrics = task_results.get("gsm8k", {}).get("metrics", {})
     humaneval_metrics = task_results.get("humaneval", {}).get("metrics", {})
+
     return {
         "ifeval_score": _pick_metric(
             ifeval_metrics,
-            ["prompt_level_strict", "prompt_level_loose", "inst_level_strict", "accuracy", "acc"],
+            [
+                "prompt_level_strict",
+                "prompt_level_loose",
+                "inst_level_strict",
+                "inst_level_loose",
+                "accuracy",
+                "acc",
+            ],
         ),
         "gsm8k_accuracy": _pick_metric(gsm8k_metrics, ["accuracy", "acc", "exact_match", "correct"]),
         "humaneval_score": _pick_metric(humaneval_metrics, ["pass@1", "accuracy", "acc", "correct"]),
     }
 
 
-def _average_available(values: List[Optional[float]]) -> Optional[float]:
+def _average_available(values):
     present = [v for v in values if v is not None]
     if not present:
         return None
     return float(sum(present) / len(present))
 
 
-def _format_score(value: Optional[float]) -> str:
-    return "N/A" if value is None else f"{value:.4f}"
+def _format_score(value):
+    if value is None:
+        return "N/A"
+    return f"{value:.4f}"
 
 
-def _row_to_task_and_conversation(row: Dict[str, Any]) -> Optional[Tuple[str, List[Dict[str, str]]]]:
-    if "question" in row and "answer" in row:
-        return "gsm8k", [
-            {"role": "user", "content": str(row["question"])},
-            {"role": "assistant", "content": str(row["answer"])},
-        ]
-    if "messages" in row and isinstance(row["messages"], list):
-        return "ifeval", row["messages"]
-    if "instruction" in row and "output" in row:
-        return "code", [
-            {"role": "user", "content": str(row["instruction"])},
-            {"role": "assistant", "content": str(row["output"])},
-        ]
-    return None
-
-
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Train, save, and optionally publish a checkpoint")
-    parser.add_argument("--model", type=str, default=MODEL)
-    parser.add_argument("--num_steps", type=int, default=200)
-    parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=8e-5)
-    parser.add_argument("--rank", type=int, default=64)
-    parser.add_argument("--checkpoint_name", type=str, default="mixed_sft_1b")
-    parser.add_argument("--data_path", type=str, default=None)
-    parser.add_argument("--max_seq_len", type=int, default=DEFAULT_MAX_SEQ_LEN)
-    parser.add_argument("--checkpoint_every", type=int, default=25)
-    parser.add_argument("--save_every_steps", type=int, default=0)
-    parser.add_argument("--evaluate_top_k", type=int, default=3)
-    parser.add_argument("--eval_limit", type=int, default=30)
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--shuffle_data", dest="shuffle_data", action="store_true")
-    parser.add_argument("--no_shuffle_data", dest="shuffle_data", action="store_false")
-    parser.add_argument("--no_publish", action="store_true")
-
-    # Backward-compatible knobs used by search scripts.
-    parser.add_argument("--weight_gsm8k", type=float, default=1.0)
-    parser.add_argument("--weight_ifeval", type=float, default=1.0)
-    parser.add_argument("--weight_code", type=float, default=1.0)
-    parser.add_argument("--max_gsm8k_examples", type=int, default=0, help="0 means no cap")
-    parser.add_argument("--max_ifeval_examples", type=int, default=0, help="0 means no cap")
-    parser.add_argument("--max_code_examples", type=int, default=0, help="0 means no cap")
+def main():
+    parser = argparse.ArgumentParser(description="Train, save, and publish a checkpoint")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=MODEL,
+        help="Base model to train from (e.g. meta-llama/Llama-3.2-3B or meta-llama/Llama-3.1-8B)",
+    )
+    parser.add_argument(
+        "--num_steps",
+        type=int,
+        default=200,
+        help="Training steps (try 200 first, extend toward 500 if eval still improving)",
+    )
+    parser.add_argument("--batch_size", type=int, default=4, help="Batch size (try 8 if memory allows)")
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=8e-5,
+        help="Learning rate (8e-5 is often safer for instruction fidelity than 1e-4)",
+    )
+    parser.add_argument(
+        "--rank",
+        type=int,
+        default=64,
+        help="LoRA rank (higher can help format / constraint following)",
+    )
+    parser.add_argument("--checkpoint_name", type=str, default="mixed_sft_1b", help="Checkpoint name")
+    parser.add_argument(
+        "--checkpoint_every",
+        type=int,
+        default=25,
+        help="Save intermediate checkpoint every N steps (0 disables periodic saves)",
+    )
+    parser.add_argument(
+        "--evaluate_top_k",
+        type=int,
+        default=3,
+        help="After training, evaluate top-K checkpoints by lowest train loss (0 disables)",
+    )
+    parser.add_argument(
+        "--eval_limit",
+        type=int,
+        default=30,
+        help="Sample limit per task for candidate checkpoint evaluation",
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for data shuffling")
+    parser.add_argument(
+        "--shuffle_data",
+        dest="shuffle_data",
+        action="store_true",
+        help="Shuffle training examples each pass through the dataset (default: enabled)",
+    )
+    parser.add_argument(
+        "--no_shuffle_data",
+        dest="shuffle_data",
+        action="store_false",
+        help="Disable data shuffling and use deterministic sequential order",
+    )
+    parser.add_argument("--no_publish", action="store_true", help="Skip publishing")
+    parser.add_argument(
+        "--data_path",
+        type=str,
+        default=None,
+        help="Path to training JSONL (default: data/my_mixed_training_data.jsonl)",
+    )
+    parser.add_argument(
+        "--max_seq_len",
+        type=int,
+        default=DEFAULT_MAX_SEQ_LEN,
+        help="Max sequence length for tokenization (1024 IF focus; 2048 longer code/context)",
+    )
     parser.set_defaults(shuffle_data=True)
-    return parser
-
-
-def main() -> None:
-    parser = _build_parser()
     args = parser.parse_args()
     model_name = args.model
     max_seq_len = int(args.max_seq_len)
 
-    if (
-        tinker is None
-        or types_mod is None
-        or get_renderer_name is None
-        or get_renderer is None
-        or train_on_what is None
-        or conversation_to_datum is None
-        or get_tokenizer is None
-    ):
-        raise ModuleNotFoundError(
-            "evaluation/train_and_publish.py requires Tinker and tinker-cookbook dependencies. "
-            "Install project requirements first."
-        )
-
-    data_path = args.data_path or os.path.join(EVAL_DIR, "..", "data", "my_mixed_training_data.jsonl")
-    data_path = os.path.abspath(data_path)
-
+    # Setup
     print(f"Model: {model_name}")
     print(f"Seed: {args.seed} | Shuffle data: {args.shuffle_data}")
-    print(f"Training data path: {data_path}")
-
     tokenizer = get_tokenizer(model_name)
-    renderer_name = get_renderer_name(model_name)
-    renderer = get_renderer(renderer_name, tokenizer)
+    renderer_name = model_info.get_recommended_renderer_name(model_name)
+    renderer = renderers.get_renderer(renderer_name, tokenizer)
     print(f"Renderer: {renderer_name}")
 
-    caps = {
-        "gsm8k": args.max_gsm8k_examples,
-        "ifeval": args.max_ifeval_examples,
-        "code": args.max_code_examples,
-    }
-    task_weights = {
-        "gsm8k": max(float(args.weight_gsm8k), 0.0),
-        "ifeval": max(float(args.weight_ifeval), 0.0),
-        "code": max(float(args.weight_code), 0.0),
-    }
+    # Load custom training data
+    print("Loading custom training data from JSONL...")
+    all_conversations = []
+    
+    data_path = args.data_path or os.path.join(EVAL_DIR, "..", "data", "my_mixed_training_data.jsonl")
+    data_path = os.path.abspath(data_path)
+    if not os.path.isfile(data_path):
+        raise FileNotFoundError(f"Training data not found: {data_path}")
 
-    conversations_by_task: Dict[str, List[List[Dict[str, str]]]] = {"gsm8k": [], "ifeval": [], "code": []}
-    with open(data_path, "r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
+    print(f"Training data path: {data_path}")
+    with open(data_path, "r") as f:
+        for line in f:
             row = json.loads(line)
-            mapped = _row_to_task_and_conversation(row)
-            if mapped is None:
-                continue
-            task_name, convo = mapped
-            conversations_by_task[task_name].append(convo)
+            # Map GSM8K format
+            if "question" in row and "answer" in row:
+                all_conversations.append([
+                    {"role": "user", "content": row["question"]},
+                    {"role": "assistant", "content": row["answer"]}
+                ])
+            # Map Tulu format
+            elif "messages" in row:
+                all_conversations.append(row["messages"])
+            # Map Code format (Instruction/Output)
+            elif "instruction" in row and "output" in row:
+                all_conversations.append([
+                    {"role": "user", "content": row["instruction"]},
+                    {"role": "assistant", "content": row["output"]}
+                ])
 
-    rng = np.random.default_rng(args.seed)
-    for task_name, cap in caps.items():
-        rows = conversations_by_task[task_name]
-        if cap > 0 and len(rows) > cap:
-            indices = np.arange(len(rows))
-            rng.shuffle(indices)
-            keep = set(int(i) for i in indices[:cap])
-            conversations_by_task[task_name] = [rows[i] for i in range(len(rows)) if i in keep]
+    # Prepare training data
+    print(f"Tokenizing training data (max_length={max_seq_len})...")
+    all_data = []
+    for convo in all_conversations:
+        try:
+            datum = conversation_to_datum(
+                convo,
+                renderer,
+                max_length=max_seq_len,
+                train_on_what=renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES,
+            )
+            all_data.append(datum)
+        except Exception as e:
+            continue # Skip any malformed data rows
+            
+    print(f"  {len(all_data)} training examples prepared and tokenized!")
 
-    print("Loaded rows by task:")
-    for task_name in ("gsm8k", "ifeval", "code"):
-        print(f"  - {task_name}: {len(conversations_by_task[task_name])}")
-
-    print(f"Tokenizing data (max_length={max_seq_len})...")
-    data_by_task: Dict[str, List[Any]] = {"gsm8k": [], "ifeval": [], "code": []}
-    dropped = 0
-    for task_name, conversations in conversations_by_task.items():
-        for convo in conversations:
-            try:
-                datum = conversation_to_datum(
-                    convo,
-                    renderer,
-                    max_length=max_seq_len,
-                    train_on_what=train_on_what.ALL_ASSISTANT_MESSAGES,
-                )
-                data_by_task[task_name].append(datum)
-            except Exception:
-                dropped += 1
-
-    active_tasks = [t for t in ("gsm8k", "ifeval", "code") if data_by_task[t] and task_weights[t] > 0]
-    if not active_tasks:
-        raise RuntimeError("No usable training examples after parsing/tokenization/caps.")
-
-    print("Tokenized rows by task:")
-    for task_name in ("gsm8k", "ifeval", "code"):
-        print(f"  - {task_name}: {len(data_by_task[task_name])}")
-    print(f"Dropped malformed/unusable rows: {dropped}")
-    print("Sampling weights:")
-    for task_name in ("gsm8k", "ifeval", "code"):
-        print(f"  - {task_name}: {task_weights[task_name]:.4f}")
-
-    sampling_probs = np.array([task_weights[t] for t in active_tasks], dtype=float)
-    sampling_probs /= sampling_probs.sum()
-
+    # Create training client
     print(f"Creating LoRA training client (rank={args.rank})...")
-    sc = importlib.import_module("tinker").ServiceClient()
+    sc = tinker.ServiceClient()
     tc = sc.create_lora_training_client(base_model=model_name, rank=args.rank)
-    print("Training client ready")
+    print("  Training client ready")
 
-    adam_params = importlib.import_module("tinker").types.AdamParams(
-        learning_rate=args.lr,
-        beta1=0.9,
-        beta2=0.95,
-        eps=1e-8,
-    )
+    # Train
+    adam_params = types.AdamParams(learning_rate=args.lr, beta1=0.9, beta2=0.95, eps=1e-8)
     print(f"\nTraining for {args.num_steps} steps (batch_size={args.batch_size}, lr={args.lr})...")
     if args.checkpoint_every > 0:
-        print(f"Periodic checkpoints every {args.checkpoint_every} steps.")
-    if args.save_every_steps > 0:
-        print(f"Additional compatibility checkpoints every {args.save_every_steps} steps.")
+        print(f"Intermediate checkpoints enabled every {args.checkpoint_every} steps.")
 
-    task_indices = {task: np.arange(len(data_by_task[task])) for task in active_tasks}
-    task_cursors = {task: 0 for task in active_tasks}
-    running_task_counts = {task: 0 for task in active_tasks}
+    checkpoints = []
+    rng = np.random.default_rng(args.seed)
+    order = np.arange(len(all_data))
     if args.shuffle_data:
-        for task in active_tasks:
-            rng.shuffle(task_indices[task])
-
-    checkpoints: List[Dict[str, Any]] = []
-    saved_checkpoints: List[Dict[str, Any]] = []
-    loss = float("nan")
+        rng.shuffle(order)
+    order_cursor = 0
 
     for step in range(args.num_steps):
-        batch = []
-        batch_task_names = []
+        # Build each batch from a reproducible (optionally shuffled) index order.
+        batch_indices = []
         for _ in range(args.batch_size):
-            task = str(rng.choice(active_tasks, p=sampling_probs))
-            idxs = task_indices[task]
-            cursor = task_cursors[task]
-            if cursor >= len(idxs):
-                cursor = 0
+            if order_cursor >= len(order):
+                order_cursor = 0
                 if args.shuffle_data:
-                    rng.shuffle(idxs)
-                task_indices[task] = idxs
-            datum = data_by_task[task][int(idxs[cursor])]
-            task_cursors[task] = cursor + 1
-            batch.append(datum)
-            batch_task_names.append(task)
-            running_task_counts[task] += 1
+                    rng.shuffle(order)
+            batch_indices.append(int(order[order_cursor]))
+            order_cursor += 1
+        batch = [all_data[i] for i in batch_indices]
 
         fwd_bwd_future = tc.forward_backward(batch, loss_fn="cross_entropy")
         optim_future = tc.optim_step(adam_params)
+
         fwd_bwd_result = fwd_bwd_future.result()
         optim_future.result()
 
+        # Compute loss
         logprobs = np.concatenate([o["logprobs"].tolist() for o in fwd_bwd_result.loss_fn_outputs])
         weights = np.concatenate([d.loss_fn_inputs["weights"].tolist() for d in batch])
-        loss = float(-np.dot(logprobs, weights) / max(weights.sum(), 1))
-
+        loss = -np.dot(logprobs, weights) / max(weights.sum(), 1)
+        
+        # Only print every 10 steps so it doesn't spam your terminal
         if step % 10 == 0 or step == args.num_steps - 1:
-            totals = ", ".join(f"{t}:{running_task_counts[t]}" for t in active_tasks)
-            in_batch = ", ".join(batch_task_names[: min(6, len(batch_task_names))])
-            print(
-                f"  Step {step + 1}/{args.num_steps} | Loss: {loss:.4f} | "
-                f"sampled(total)={totals} | batch preview={in_batch}"
-            )
+            print(f"  Step {step+1}/{args.num_steps} | Loss: {loss:.4f}")
 
+        # Save periodic checkpoint if requested
         step_num = step + 1
-        should_save_compat = (
-            args.save_every_steps > 0
-            and step_num % args.save_every_steps == 0
-            and step_num != args.num_steps
-        )
-        if should_save_compat:
-            name = f"{args.checkpoint_name}_step{step_num}"
-            print(f"\nSaving compatibility checkpoint '{name}'...")
-            ckpt = tc.save_weights_for_sampler(name=name).result()
-            saved_checkpoints.append(
-                {
-                    "name": name,
-                    "path": ckpt.path,
-                    "step": step_num,
-                    "type": "compat_periodic",
-                    "train_loss": loss,
-                    "published": False,
-                }
-            )
-            print(f"  Saved: {ckpt.path}")
-
         if args.checkpoint_every > 0 and step_num % args.checkpoint_every == 0:
-            name = f"{args.checkpoint_name}_step_{step_num}"
-            print(f"\nSaving periodic checkpoint '{name}'...")
-            ckpt = tc.save_weights_for_sampler(name=name).result()
+            periodic_name = f"{args.checkpoint_name}_step_{step_num}"
+            print(f"\nSaving periodic checkpoint '{periodic_name}'...")
+            ckpt = tc.save_weights_for_sampler(name=periodic_name).result()
+            periodic_path = ckpt.path
+            print(f"  Periodic checkpoint saved: {periodic_path}")
             checkpoints.append(
                 {
-                    "name": name,
-                    "path": ckpt.path,
+                    "name": periodic_name,
+                    "path": periodic_path,
                     "step": step_num,
                     "type": "periodic",
-                    "train_loss": loss,
+                    "train_loss": float(loss),
                 }
             )
-            print(f"  Saved: {ckpt.path}")
 
-    print(f"\nSaving final checkpoint '{args.checkpoint_name}'...")
-    final_ckpt = tc.save_weights_for_sampler(name=args.checkpoint_name).result()
-    checkpoint_path = final_ckpt.path
+    # Save checkpoint
+    print(f"\nSaving checkpoint '{args.checkpoint_name}'...")
+    ckpt = tc.save_weights_for_sampler(name=args.checkpoint_name).result()
+    checkpoint_path = ckpt.path
+    print(f"  Checkpoint saved: {checkpoint_path}")
     checkpoints.append(
         {
             "name": args.checkpoint_name,
             "path": checkpoint_path,
             "step": args.num_steps,
             "type": "final",
-            "train_loss": loss,
+            "train_loss": float(loss),
         }
     )
-    saved_checkpoints.append(
-        {
-            "name": args.checkpoint_name,
-            "path": checkpoint_path,
-            "step": args.num_steps,
-            "type": "final",
-            "train_loss": loss,
-            "published": False,
-        }
-    )
-    print(f"  Saved: {checkpoint_path}")
 
     candidate_eval = None
-    if args.evaluate_top_k > 0 and checkpoints:
+    if args.evaluate_top_k > 0:
         from evaluation.eval_all import run_core
 
-        candidates = sorted(checkpoints, key=lambda cp: cp.get("train_loss", float("inf")))
-        candidates = candidates[: min(args.evaluate_top_k, len(candidates))]
+        # Pick the lowest-loss checkpoints as candidates to evaluate on real tasks.
+        sorted_by_loss = sorted(
+            checkpoints,
+            key=lambda cp: cp.get("train_loss", float("inf")),
+        )
+        candidates = sorted_by_loss[: min(args.evaluate_top_k, len(sorted_by_loss))]
         print("\nEvaluating candidate checkpoints...")
+        print(
+            "  Candidates (lowest train loss): "
+            + ", ".join(
+                f"{cp['name']}@{cp['step']} (loss={cp.get('train_loss', float('nan')):.4f})"
+                for cp in candidates
+            )
+        )
 
         ranked_results = []
         for cp in candidates:
-            print(f"  - {cp['name']} ({cp['path']})")
+            print(f"\nRunning eval on candidate: {cp['name']} ({cp['path']})")
             _, task_results = asyncio.run(
                 run_core(
                     base_model=model_name,
@@ -420,10 +352,12 @@ def main() -> None:
                 }
             )
 
-        ranked_results.sort(
+        ranked_results = sorted(
+            ranked_results,
             key=lambda r: r["average_score"] if r["average_score"] is not None else -1.0,
             reverse=True,
         )
+
         candidate_eval = {
             "top_k": args.evaluate_top_k,
             "eval_limit": args.eval_limit,
@@ -432,45 +366,34 @@ def main() -> None:
             "best_candidate": ranked_results[0] if ranked_results else None,
         }
 
-        print("\nCandidate ranking:")
+        print("\nCandidate checkpoint ranking (higher is better):")
         for i, row in enumerate(ranked_results, start=1):
-            s = row["headline_scores"]
+            scores = row["headline_scores"]
             print(
-                f"  {i}. {row['name']} | avg={_format_score(row['average_score'])} | "
-                f"IFEval={_format_score(s['ifeval_score'])} | "
-                f"GSM8K={_format_score(s['gsm8k_accuracy'])} | "
-                f"HumanEval={_format_score(s['humaneval_score'])}"
+                f"  {i}. {row['name']} | avg={_format_score(row['average_score'])} "
+                f"| ifeval={_format_score(scores['ifeval_score'])} "
+                f"| gsm8k={_format_score(scores['gsm8k_accuracy'])} "
+                f"| humaneval={_format_score(scores['humaneval_score'])}"
             )
     else:
-        print("\nSkipping candidate checkpoint evaluation.")
+        print("\nSkipping candidate checkpoint evaluation (--evaluate_top_k=0).")
 
-    published = False
+    # Publish
     if not args.no_publish:
-        print("\nPublishing final checkpoint...")
+        print("\nPublishing checkpoint...")
         rest_client = sc.create_rest_client()
         rest_client.publish_checkpoint_from_tinker_path(checkpoint_path).result()
-        published = True
-        if saved_checkpoints:
-            saved_checkpoints[-1]["published"] = True
-        print("  Published successfully.")
+        print("  Published successfully!")
     else:
         print("\nSkipping publish (--no_publish).")
 
+    # Save checkpoint info
     info = {
         "created_at": datetime.utcnow().isoformat() + "Z",
         "checkpoint_path": checkpoint_path,
         "checkpoints": checkpoints,
-        "saved_checkpoints": saved_checkpoints,
         "base_model": model_name,
         "renderer_name": renderer_name,
-        "data_path": data_path,
-        "sampling_weights": task_weights,
-        "stage2_sampling_weights": None,
-        "task_example_caps": {
-            "gsm8k": args.max_gsm8k_examples,
-            "ifeval": args.max_ifeval_examples,
-            "code": args.max_code_examples,
-        },
         "training": {
             "data_path": data_path,
             "num_steps": args.num_steps,
@@ -479,35 +402,18 @@ def main() -> None:
             "lora_rank": args.rank,
             "max_seq_len": max_seq_len,
             "checkpoint_every": args.checkpoint_every,
-            "save_every_steps": args.save_every_steps,
             "seed": args.seed,
             "shuffle_data": args.shuffle_data,
         },
-        "data_stats": {
-            "active_tasks": active_tasks,
-            "rows_per_task_before_tokenization": {
-                "gsm8k": len(conversations_by_task["gsm8k"]),
-                "ifeval": len(conversations_by_task["ifeval"]),
-                "code": len(conversations_by_task["code"]),
-            },
-            "rows_per_task_after_tokenization": {
-                "gsm8k": len(data_by_task["gsm8k"]),
-                "ifeval": len(data_by_task["ifeval"]),
-                "code": len(data_by_task["code"]),
-            },
-            "dropped_rows": dropped,
-        },
         "candidate_evaluation": candidate_eval,
-        "published": published,
+        "published": not args.no_publish,
     }
-
     info_path = os.path.join(EVAL_DIR, "checkpoint_info.json")
-    with open(info_path, "w", encoding="utf-8") as handle:
-        json.dump(info, handle, indent=2)
+    with open(info_path, "w") as f:
+        json.dump(info, f, indent=2)
     print(f"\nCheckpoint info saved to {info_path}")
-    print("\nNext: evaluate with")
-    print(f'  PYTHONPATH=. python evaluation/eval_all.py --checkpoint_path "{checkpoint_path}" --base_model {model_name}')
-
+    print(f"\nNext: evaluate your checkpoint with")
+    print(f"  PYTHONPATH=. python evaluation/eval_all.py --checkpoint_path \"{checkpoint_path}\" --base_model {model_name}")
 
 if __name__ == "__main__":
     main()
