@@ -31,10 +31,6 @@ REQUIRED_EVAL_VERSIONS = {
     "inspect-ai": "0.3.170",
     "inspect-evals": "0.3.106",
     "openai": "2.30.0",
-    "torch": "2.7.0",
-    "transformers": "4.46.3",
-    "tokenizers": "0.20.3",
-    "huggingface-hub": "0.36.2",
 }
 
 
@@ -296,6 +292,12 @@ def main() -> None:
     parser.add_argument("--checkpoint_name", type=str, default="sanity_1b")
     parser.add_argument("--checkpoint_every", type=int, default=25)
     parser.add_argument(
+        "--train_data_path",
+        type=str,
+        default=None,
+        help="Optional JSONL training data path passed to train_and_publish.py",
+    )
+    parser.add_argument(
         "--num_best_checkpoints",
         type=int,
         default=3,
@@ -371,6 +373,8 @@ def main() -> None:
         ]
         if args.model:
             train_cmd.extend(["--model", args.model])
+        if args.train_data_path:
+            train_cmd.extend(["--data_path", args.train_data_path])
         run_cmd(train_cmd, cwd=REPO_ROOT)
 
     checkpoint_info_path = Path(args.checkpoint_info_path).resolve()
@@ -558,6 +562,7 @@ def main() -> None:
         "base_model": base_model,
         "training_args": {
             "model_override": args.model,
+            "train_data_path": args.train_data_path,
             "num_steps": args.num_steps,
             "batch_size": args.batch_size,
             "lr": args.lr,
