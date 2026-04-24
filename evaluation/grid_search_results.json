@@ -1,0 +1,21 @@
+[
+  {
+    "config": {
+      "weights": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "caps": [
+        7473,
+        7473,
+        7473
+      ],
+      "lr": 5e-05,
+      "rank": 64,
+      "num_steps": 2500,
+      "checkpoint_name": "mix_w1.0-1.0-1.0_cap7473-7473-7473_lr5e-05_r64_s2500"
+    },
+    "status": "train_failed"
+  }
+]

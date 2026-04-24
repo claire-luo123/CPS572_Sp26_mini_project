@@ -1,0 +1,33 @@
+EXPERIMENT SUMMARY
+Run timestamp (UTC): 2026-04-24T17:30:53.697181Z
+Base model: meta-llama/Llama-3.1-8B
+Training steps: 100
+Checkpoint cadence: every 25 steps
+
+Baseline scores:
+  IFEval:   0.1701
+  GSM8K:    0.0978
+  HumanEval:0.0000
+
+Best checkpoint:
+  Name: sanity_1b_step_50
+  Step: 50
+  Path: tinker://f6bc0ecf-39c6-50a7-ac54-95fd6d9945fb:train:0/sampler_weights/sanity_1b_step_50
+
+Best checkpoint full-eval scores:
+  IFEval:   0.2514
+  GSM8K:    0.4951
+  HumanEval:0.4512
+
+Checkpoint candidates (quick eval):
+  - sanity_1b_step_50 (step 50): IFEval=0.3000, GSM8K=0.4333, HumanEval=0.6667, Avg=0.4667
+  - sanity_1b_step_75 (step 75): IFEval=0.1667, GSM8K=0.4667, HumanEval=0.7000, Avg=0.4444
+  - sanity_1b_step_100 (step 100): IFEval=0.2333, GSM8K=0.3667, HumanEval=0.6333, Avg=0.4111
+
+Top checkpoint full-eval scores:
+  - sanity_1b_step_50 (step 50): IFEval=0.2514, GSM8K=0.4951, HumanEval=0.4512
+  - sanity_1b_step_75 (step 75): IFEval=0.2551, GSM8K=0.4428, HumanEval=0.4451
+  - sanity_1b_step_100 (step 100): IFEval=0.2440, GSM8K=0.3662, HumanEval=0.4573
+
+Report JSON: /Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/evaluation/grid_search_runs/20260424_170357/runs/if33_gsm33_code34/experiment_report.json
+Report Markdown: /Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/evaluation/grid_search_runs/20260424_170357/runs/if33_gsm33_code34/experiment_report.md

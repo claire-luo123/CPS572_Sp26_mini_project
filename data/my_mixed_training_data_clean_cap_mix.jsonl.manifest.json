@@ -1,0 +1,42 @@
+{
+  "input": "/Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/data/my_mixed_training_data.jsonl",
+  "output": "/Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/data/my_mixed_training_data_clean_cap_mix.jsonl",
+  "seed": 42,
+  "caps": {
+    "instruction_following": 10000,
+    "gsm8k": 7473,
+    "code": 10000
+  },
+  "mix_percent": {
+    "instruction_following": 50,
+    "gsm8k": 25,
+    "code": 25
+  },
+  "weights_note": "Uniform SFT (implicit weight 1.0 per row); caps+mix only affect which rows appear.",
+  "raw_line_bucket_counts": {
+    "instruction_following": 15000,
+    "gsm8k": 7473,
+    "code": 15000,
+    "unknown": 0
+  },
+  "after_clean_dedup_counts": {
+    "instruction_following": 14944,
+    "gsm8k": 7473,
+    "code": 14991
+  },
+  "dropped_malformed_or_empty": 0,
+  "dropped_duplicate": 65,
+  "after_cap_pool_sizes": {
+    "instruction_following": 10000,
+    "gsm8k": 7473,
+    "code": 10000
+  },
+  "final_total_rows": 20000,
+  "final_per_bucket": {
+    "instruction_following": 10000,
+    "gsm8k": 5000,
+    "code": 5000
+  },
+  "max_chars_per_row": null,
+  "output_shuffled": true
+}

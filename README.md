@@ -55,13 +55,16 @@ python evaluation/eval_all.py --base_models meta-llama/Llama-3.2-1B meta-llama/L
 
 If your numbers match within ~1%, your setup is working correctly. Results are saved to `evaluation/baseline_results.json`.
 
-### Step 2: Run the Toy Training Example
+### Step 2: Smoke-Test the Training Pipeline
 
 Verify that the full train → save → publish → evaluate pipeline works:
 
 ```bash
-# Train for 10 steps on dummy data:
-python evaluation/train_and_publish.py
+# Build a filtered multi-task mix:
+python prepare_data.py
+
+# Train a short smoke-test run on the mixed data:
+python evaluation/train_and_publish.py --num_steps 10 --no_publish
 
 # This saves a checkpoint path to evaluation/checkpoint_info.json and can also be found on your tinker dashboard (https://tinker-console.thinkingmachines.ai/checkpoints)
 
@@ -69,16 +72,16 @@ python evaluation/train_and_publish.py
 python evaluation/eval_all.py --checkpoint_path "tinker://your-checkpoint-path" --base_model meta-llama/Llama-3.2-3B
 ```
 
-The toy example (`train_and_publish.py`) trains on fake data — the scores will be low, but it confirms the workflow is functional.
+The smoke-test scores will be low, but it confirms the workflow is functional.
 
 ### Step 3: Implement Your Training
 
-Replace the toy training data and logic in `train_and_publish.py` with your own implementation. This is where the real work begins:
+The repo now includes a baseline multi-task SFT pipeline with filtered data prep, weighted task sampling, optional two-stage mixing, and periodic checkpoint saves. This is where the real work begins:
 
-1. Load real training datasets (see [Suggested Datasets](PROJECT.md#suggested-datasets))
-2. Design your training strategy (data mixing, hyperparameters, etc.)
+1. Build a filtered training mix with `python prepare_data.py`
+2. Tune data mixing and hyperparameters with `python grid_search.py`
 3. Train on a small model first (Llama-3.2-1B or 3B) to iterate quickly
-4. Train on Llama-3.1-8B for your final submission
+4. Train the final recipe on Llama-3.1-8B for submission
 
 ### Step 4: Evaluate and Submit
 
@@ -132,7 +135,9 @@ These settings are stored in `submission.json` so the instructor can reproduce y
 | [`evaluation/eval_ifeval.py`](evaluation/eval_ifeval.py) | IFEval evaluation (Inspect AI) |
 | [`evaluation/eval_gsm8k.py`](evaluation/eval_gsm8k.py) | GSM8K evaluation (Inspect AI, zero-shot) |
 | [`evaluation/eval_code.py`](evaluation/eval_code.py) | HumanEval evaluation (Inspect AI, local sandbox) |
-| [`evaluation/train_and_publish.py`](evaluation/train_and_publish.py) | **Toy example** — replace with your training code |
+| [`prepare_data.py`](prepare_data.py) | Builds a filtered GSM8K + IF + code training mix and saves mix statistics |
+| [`grid_search.py`](grid_search.py) | Runs a focused search over task mixing and core SFT hyperparameters |
+| [`evaluation/train_and_publish.py`](evaluation/train_and_publish.py) | Multi-task LoRA SFT trainer with weighted sampling, optional stage-2 mix, and checkpoint saves |
 | [`evaluation/run_eval.sh`](evaluation/run_eval.sh) | Bash shortcut for checkpoint evaluation |
 
 You can also run individual tasks:

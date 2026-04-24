@@ -1,0 +1,33 @@
+EXPERIMENT SUMMARY
+Run timestamp (UTC): 2026-04-24T07:08:47.177725Z
+Base model: meta-llama/Llama-3.1-8B
+Training steps: 100
+Checkpoint cadence: every 25 steps
+
+Baseline scores:
+  IFEval:   0.1571
+  GSM8K:    0.0993
+  HumanEval:0.0000
+
+Best checkpoint:
+  Name: sanity_1b_step_500
+  Step: 500
+  Path: tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_500
+
+Best checkpoint full-eval scores:
+  IFEval:   0.3752
+  GSM8K:    0.6232
+  HumanEval:0.4939
+
+Checkpoint candidates (quick eval):
+  - sanity_1b_step_340 (step 340): IFEval=0.3667, GSM8K=0.6667, HumanEval=0.7333, Avg=0.5889
+  - sanity_1b (step 500): IFEval=0.4000, GSM8K=0.6000, HumanEval=0.6667, Avg=0.5556
+  - sanity_1b_step_500 (step 500): IFEval=0.4333, GSM8K=0.5667, HumanEval=0.6333, Avg=0.5444
+
+Top checkpoint full-eval scores:
+  - sanity_1b_step_340 (step 340): IFEval=0.3771, GSM8K=0.5951, HumanEval=0.4939
+  - sanity_1b (step 500): IFEval=0.3697, GSM8K=0.6156, HumanEval=0.5061
+  - sanity_1b_step_500 (step 500): IFEval=0.3752, GSM8K=0.6232, HumanEval=0.4939
+
+Report JSON: /Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/evaluation/experiment_runs/20260424_062836/experiment_report.json
+Report Markdown: /Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/evaluation/experiment_runs/20260424_062836/experiment_report.md
