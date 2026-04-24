@@ -29,13 +29,12 @@ from tinker_cookbook import model_info, renderers
 from tinker_cookbook.supervised.data import conversation_to_datum
 from tinker_cookbook.tokenizer_utils import get_tokenizer
 
-# Default to 3B for stronger runs; switch back to 1B for cheaper iteration.
-# MODEL = "meta-llama/Llama-3.2-1B"
-MODEL = "meta-llama/Llama-3.2-8B"
-# MODEL = "meta-llama/Llama-3.1-8B"    # Recommended for final submission
+# Default submission model; override with --model.
+MODEL = "meta-llama/Llama-3.1-8B"
 
-# Longer contexts help code / long IF rows; raise carefully if you hit memory limits.
-MAX_SEQ_LEN = 1024
+# Default max sequence length for tokenization (override with --max_seq_len).
+# Use 1024 for IF-heavy focus; 2048 if you need longer code / multi-turn contexts (more VRAM).
+DEFAULT_MAX_SEQ_LEN = 1024
 
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -98,15 +97,30 @@ def main():
         default=MODEL,
         help="Base model to train from (e.g. meta-llama/Llama-3.2-3B or meta-llama/Llama-3.1-8B)",
     )
-    parser.add_argument("--num_steps", type=int, default=2000, help="Number of training steps")
-    parser.add_argument("--batch_size", type=int, default=4, help="Batch size")
-    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument("--rank", type=int, default=32, help="LoRA rank")
+    parser.add_argument(
+        "--num_steps",
+        type=int,
+        default=200,
+        help="Training steps (try 200 first, extend toward 500 if eval still improving)",
+    )
+    parser.add_argument("--batch_size", type=int, default=4, help="Batch size (try 8 if memory allows)")
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=8e-5,
+        help="Learning rate (8e-5 is often safer for instruction fidelity than 1e-4)",
+    )
+    parser.add_argument(
+        "--rank",
+        type=int,
+        default=64,
+        help="LoRA rank (higher can help format / constraint following)",
+    )
     parser.add_argument("--checkpoint_name", type=str, default="mixed_sft_1b", help="Checkpoint name")
     parser.add_argument(
         "--checkpoint_every",
         type=int,
-        default=0,
+        default=25,
         help="Save intermediate checkpoint every N steps (0 disables periodic saves)",
     )
     parser.add_argument(
@@ -135,9 +149,22 @@ def main():
         help="Disable data shuffling and use deterministic sequential order",
     )
     parser.add_argument("--no_publish", action="store_true", help="Skip publishing")
+    parser.add_argument(
+        "--data_path",
+        type=str,
+        default=None,
+        help="Path to training JSONL (default: data/my_mixed_training_data.jsonl)",
+    )
+    parser.add_argument(
+        "--max_seq_len",
+        type=int,
+        default=DEFAULT_MAX_SEQ_LEN,
+        help="Max sequence length for tokenization (1024 IF focus; 2048 longer code/context)",
+    )
     parser.set_defaults(shuffle_data=True)
     args = parser.parse_args()
     model_name = args.model
+    max_seq_len = int(args.max_seq_len)
 
     # Setup
     print(f"Model: {model_name}")
@@ -151,9 +178,12 @@ def main():
     print("Loading custom training data from JSONL...")
     all_conversations = []
     
-    # Update this path if your jsonl file is named differently!
-    data_path = os.path.join(EVAL_DIR, "..", "data", "my_mixed_training_data.jsonl") 
-    
+    data_path = args.data_path or os.path.join(EVAL_DIR, "..", "data", "my_mixed_training_data.jsonl")
+    data_path = os.path.abspath(data_path)
+    if not os.path.isfile(data_path):
+        raise FileNotFoundError(f"Training data not found: {data_path}")
+
+    print(f"Training data path: {data_path}")
     with open(data_path, "r") as f:
         for line in f:
             row = json.loads(line)
@@ -174,14 +204,14 @@ def main():
                 ])
 
     # Prepare training data
-    print(f"Tokenizing training data (max_length={MAX_SEQ_LEN})...")
+    print(f"Tokenizing training data (max_length={max_seq_len})...")
     all_data = []
     for convo in all_conversations:
         try:
             datum = conversation_to_datum(
                 convo,
                 renderer,
-                max_length=MAX_SEQ_LEN,
+                max_length=max_seq_len,
                 train_on_what=renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES,
             )
             all_data.append(datum)
@@ -365,11 +395,12 @@ def main():
         "base_model": model_name,
         "renderer_name": renderer_name,
         "training": {
+            "data_path": data_path,
             "num_steps": args.num_steps,
             "batch_size": args.batch_size,
             "learning_rate": args.lr,
             "lora_rank": args.rank,
-            "max_seq_len": MAX_SEQ_LEN,
+            "max_seq_len": max_seq_len,
             "checkpoint_every": args.checkpoint_every,
             "seed": args.seed,
             "shuffle_data": args.shuffle_data,
