@@ -1,13 +1,38 @@
 {
-  "checkpoint_path": "tinker://0f3f872d-369e-5b57-a3a0-64746a81ae94:train:0/sampler_weights/mixed_sft_1b",
-  "base_model": "meta-llama/Llama-3.2-1B",
+  "checkpoint_path": "tinker://05e9f732-016a-5f7b-a4b0-73066a4aafb1:train:0/sampler_weights/math_push_3b_v1",
+  "base_model": "meta-llama/Llama-3.2-3B",
   "renderer_name": "role_colon",
-  "training": {
-    "num_steps": 2000,
-    "batch_size": 4,
-    "learning_rate": 0.0001,
-    "lora_rank": 32,
-    "max_seq_len": 1024
+  "data_path": "data/my_mixed_training_data.jsonl",
+  "sampling_weights": {
+    "gsm8k": 1.4,
+    "ifeval": 1.0,
+    "code": 1.0
   },
-  "published": true
+  "stage2_sampling_weights": null,
+  "task_example_caps": {
+    "gsm8k": 7473,
+    "ifeval": 10000,
+    "code": 10000
+  },
+  "training": {
+    "num_steps": 1500,
+    "batch_size": 6,
+    "learning_rate": 5e-05,
+    "lora_rank": 64,
+    "max_seq_len": 1280,
+    "max_examples_per_task": 12000,
+    "save_every_steps": 0,
+    "stage2_start": 0,
+    "seed": 42
+  },
+  "saved_checkpoints": [
+    {
+      "step": 1500,
+      "name": "math_push_3b_v1",
+      "path": "tinker://05e9f732-016a-5f7b-a4b0-73066a4aafb1:train:0/sampler_weights/math_push_3b_v1",
+      "published": false,
+      "final": true
+    }
+  ],
+  "published": false
 }
