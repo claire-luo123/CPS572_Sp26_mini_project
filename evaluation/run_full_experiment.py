@@ -303,15 +303,25 @@ def main() -> None:
     assert_eval_environment_ok()
 
     parser = argparse.ArgumentParser(description="One-command full training + evaluation pipeline")
-    parser.add_argument("--num_steps", type=int, default=100)
+    parser.add_argument(
+        "--num_steps",
+        type=int,
+        default=200,
+        help="Training steps (start 200, extend toward 500 if still improving)",
+    )
     parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=1e-4)
-    parser.add_argument("--rank", type=int, default=32)
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=8e-5,
+        help="Learning rate (8e-5 often safer for instruction fidelity than 1e-4)",
+    )
+    parser.add_argument("--rank", type=int, default=64, help="LoRA rank")
     parser.add_argument(
         "--model",
         type=str,
-        default=None,
-        help="Override base model used for training (e.g. meta-llama/Llama-3.1-8B)",
+        default="meta-llama/Llama-3.1-8B",
+        help="Base model for training and eval",
     )
     parser.add_argument("--checkpoint_name", type=str, default="sanity_1b")
     parser.add_argument("--checkpoint_every", type=int, default=25)
@@ -320,6 +330,12 @@ def main() -> None:
         type=str,
         default=None,
         help="Optional JSONL training data path passed to train_and_publish.py",
+    )
+    parser.add_argument(
+        "--max_seq_len",
+        type=int,
+        default=1024,
+        help="Passed to train_and_publish.py (1024 IF focus; 2048 longer code/context)",
     )
     parser.add_argument(
         "--num_best_checkpoints",
@@ -342,7 +358,7 @@ def main() -> None:
         "--quick_eval_limit",
         type=int,
         default=30,
-        help="Sample limit per task when ranking checkpoints quickly",
+        help="Sample limit per task when ranking checkpoints (30 fast; 50 if IFEval ranking is noisy)",
     )
     parser.add_argument(
         "--final_eval_limit",
@@ -401,10 +417,12 @@ def main() -> None:
             args.checkpoint_name,
             "--checkpoint_every",
             str(args.checkpoint_every),
+            "--max_seq_len",
+            str(args.max_seq_len),
+            "--model",
+            args.model,
             "--no_publish",
         ]
-        if args.model:
-            train_cmd.extend(["--model", args.model])
         if args.train_data_path:
             train_cmd.extend(["--data_path", args.train_data_path])
         run_cmd(train_cmd, cwd=REPO_ROOT)
@@ -605,6 +623,7 @@ def main() -> None:
         "training_args": {
             "model_override": args.model,
             "train_data_path": args.train_data_path,
+            "max_seq_len": args.max_seq_len,
             "num_steps": args.num_steps,
             "batch_size": args.batch_size,
             "lr": args.lr,
