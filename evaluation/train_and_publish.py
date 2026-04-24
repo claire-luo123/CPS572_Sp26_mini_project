@@ -1,33 +1,26 @@
 """
-Train a model (minimal SFT), save checkpoint, and publish it.
+Train a multi-task LoRA checkpoint for IFEval + GSM8K + HumanEval.
 
-NOTE: This is a TOY EXAMPLE that trains for a few steps on dummy data
-to verify the full workflow end-to-end. You should replace the training
-data and training logic with your own implementation.
+This script expects a JSONL mix that contains rows in one of these schemas:
+  - GSM8K-style: {"question": "...", "answer": "..."}
+  - IF-style: {"messages": [{"role": "...", "content": "..."}, ...]}
+  - Code-style: {"instruction": "...", "output": "..."}
 
-TODO:
-  - Replace DEMO_CONVERSATIONS with your task-specific training data
-  - Tune hyperparameters (learning rate, batch size, number of steps, LoRA rank)
-  - Add validation / early stopping as needed
-
-Usage:
-    python evaluation/train_and_publish.py
-    python evaluation/train_and_publish.py --num_steps 20
-    python evaluation/train_and_publish.py --no_publish   # skip publishing
+Compared to the original toy example, this version:
+  - tracks per-task examples
+  - tokenizes per task
+  - trains with weighted task sampling (prevents one task from dominating)
+  - exposes practical hyperparameters via CLI flags
 """
 
 import argparse
 import asyncio
 import json
 import os
+import re
 from datetime import datetime
 
 import numpy as np
-import tinker
-from tinker import types
-from tinker_cookbook import model_info, renderers
-from tinker_cookbook.supervised.data import conversation_to_datum
-from tinker_cookbook.tokenizer_utils import get_tokenizer
 
 # Default submission model; override with --model.
 MODEL = "meta-llama/Llama-3.1-8B"
@@ -171,6 +164,14 @@ def main():
     model_name = args.model
     max_seq_len = int(args.max_seq_len)
 
+    if tinker is None or types is None or model_info is None or renderers is None or conversation_to_datum is None or get_tokenizer is None:
+        raise ModuleNotFoundError(
+            "evaluation/train_and_publish.py requires Tinker and tinker-cookbook dependencies. "
+            "Install project requirements first."
+        )
+
+    rng = np.random.default_rng(args.seed)
+
     # Setup
     print(f"Model: {model_name}")
     print(f"Seed: {args.seed} | Shuffle data: {args.shuffle_data}")
@@ -263,10 +264,30 @@ def main():
         logprobs = np.concatenate([o["logprobs"].tolist() for o in fwd_bwd_result.loss_fn_outputs])
         weights = np.concatenate([d.loss_fn_inputs["weights"].tolist() for d in batch])
         loss = -np.dot(logprobs, weights) / max(weights.sum(), 1)
-        
-        # Only print every 10 steps so it doesn't spam your terminal
+
+        # Print periodic training signal + realized task mix.
         if step % 10 == 0 or step == args.num_steps - 1:
-            print(f"  Step {step+1}/{args.num_steps} | Loss: {loss:.4f}")
+            task_mix = ", ".join(f"{t}:{running_task_counts[t]}" for t in active_tasks)
+            stage_mix = ", ".join(f"{t}:{stage_task_counts[current_stage][t]}" for t in active_tasks)
+            print(
+                f"  Step {step+1}/{args.num_steps} | Stage {current_stage} | Loss: {loss:.4f}"
+                f" | Total seen -> {task_mix} | Stage seen -> {stage_mix}"
+            )
+
+        if args.save_every_steps > 0 and (step + 1) % args.save_every_steps == 0 and step != args.num_steps - 1:
+            interval_name = f"{args.checkpoint_name}_step{step + 1}"
+            print(f"\nSaving intermediate checkpoint '{interval_name}'...")
+            interval_ckpt = tc.save_weights_for_sampler(name=interval_name).result()
+            saved_checkpoints.append(
+                {
+                    "step": step + 1,
+                    "name": interval_name,
+                    "path": interval_ckpt.path,
+                    "published": False,
+                    "final": False,
+                }
+            )
+            print(f"  Intermediate checkpoint saved: {interval_ckpt.path}")
 
         # Save periodic checkpoint if requested
         step_num = step + 1
@@ -386,6 +407,7 @@ def main():
         rest_client = sc.create_rest_client()
         rest_client.publish_checkpoint_from_tinker_path(checkpoint_path).result()
         print("  Published successfully!")
+        saved_checkpoints[-1]["published"] = True
     else:
         print("\nSkipping publish (--no_publish).")
 
@@ -396,6 +418,14 @@ def main():
         "checkpoints": checkpoints,
         "base_model": model_name,
         "renderer_name": renderer_name,
+        "data_path": args.data_path,
+        "sampling_weights": task_weights,
+        "stage2_sampling_weights": stage2_weights,
+        "task_example_caps": {
+            "gsm8k": args.max_gsm8k_examples,
+            "ifeval": args.max_ifeval_examples,
+            "code": args.max_code_examples,
+        },
         "training": {
             "data_path": data_path,
             "num_steps": args.num_steps,

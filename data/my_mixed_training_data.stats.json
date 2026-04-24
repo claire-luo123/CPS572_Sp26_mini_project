@@ -1,0 +1,41 @@
+{
+  "output_path": "data/my_mixed_training_data.jsonl",
+  "seed": 42,
+  "counts": {
+    "gsm8k": 7473,
+    "ifeval": 12000,
+    "code": 12000,
+    "total": 31473
+  },
+  "datasets": {
+    "gsm8k": {
+      "dataset": "openai/gsm8k",
+      "loaded": 7473,
+      "selected": 7473
+    },
+    "ifeval": {
+      "dataset": "allenai/tulu-3-sft-mixture",
+      "candidate_pool": 72000,
+      "candidate_rows": 72000,
+      "rejected_refusal": 3167,
+      "rejected_non_ascii_prompt": 4945,
+      "rejected_answer_length": 6359,
+      "rejected_prompt_length": 3656,
+      "rejected_no_single_turn": 49,
+      "rejected_duplicate_prompt": 531,
+      "selected": 12000,
+      "scored_candidates": 53293
+    },
+    "code": {
+      "dataset": "nvidia/OpenCodeInstruct",
+      "candidate_pool": 72000,
+      "candidate_rows": 72000,
+      "rejected_not_python": 274,
+      "rejected_prompt_length": 28,
+      "rejected_duplicate_prompt": 171,
+      "rejected_output_length": 6,
+      "selected": 12000,
+      "scored_candidates": 71521
+    }
+  }
+}

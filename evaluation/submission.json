@@ -20,9 +20,9 @@
     },
     "samples": [
       {
-        "id": 13,
-        "prompt_strict": false,
-        "prompt_loose": false,
+        "id": 102,
+        "prompt_strict": true,
+        "prompt_loose": true,
         "num_instructions": 1,
         "inst_strict": 0,
         "inst_loose": 0
@@ -44,7 +44,7 @@
         "inst_loose": 1
       },
       {
-        "id": 24,
+        "id": 122,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 1,
@@ -52,7 +52,7 @@
         "inst_loose": 0
       },
       {
-        "id": 30,
+        "id": 1000,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 3,
@@ -60,7 +60,7 @@
         "inst_loose": 0
       },
       {
-        "id": 32,
+        "id": 1001,
         "prompt_strict": false,
         "prompt_loose": true,
         "num_instructions": 1,
@@ -92,7 +92,7 @@
         "inst_loose": 1
       },
       {
-        "id": 136,
+        "id": 1021,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 2,
@@ -116,10 +116,10 @@
         "inst_loose": 1
       },
       {
-        "id": 152,
+        "id": 1069,
         "prompt_strict": false,
         "prompt_loose": false,
-        "num_instructions": 2,
+        "num_instructions": 3,
         "inst_strict": 0,
         "inst_loose": 0
       },
@@ -140,7 +140,7 @@
         "inst_loose": 1
       },
       {
-        "id": 167,
+        "id": 1075,
         "prompt_strict": true,
         "prompt_loose": true,
         "num_instructions": 1,
@@ -156,39 +156,15 @@
         "inst_loose": 1
       },
       {
-        "id": 179,
+        "id": 1087,
         "prompt_strict": false,
-        "prompt_loose": false,
+        "prompt_loose": true,
         "num_instructions": 1,
         "inst_strict": 0,
-        "inst_loose": 0
+        "inst_loose": 1
       },
       {
-        "id": 181,
-        "prompt_strict": false,
-        "prompt_loose": false,
-        "num_instructions": 1,
-        "inst_strict": 0,
-        "inst_loose": 0
-      },
-      {
-        "id": 201,
-        "prompt_strict": false,
-        "prompt_loose": false,
-        "num_instructions": 1,
-        "inst_strict": 0,
-        "inst_loose": 0
-      },
-      {
-        "id": 202,
-        "prompt_strict": false,
-        "prompt_loose": false,
-        "num_instructions": 1,
-        "inst_strict": 0,
-        "inst_loose": 0
-      },
-      {
-        "id": 209,
+        "id": 1092,
         "prompt_strict": true,
         "prompt_loose": true,
         "num_instructions": 1,
@@ -196,7 +172,39 @@
         "inst_loose": 1
       },
       {
-        "id": 218,
+        "id": 1094,
+        "prompt_strict": true,
+        "prompt_loose": true,
+        "num_instructions": 1,
+        "inst_strict": 1,
+        "inst_loose": 1
+      },
+      {
+        "id": 1098,
+        "prompt_strict": false,
+        "prompt_loose": false,
+        "num_instructions": 1,
+        "inst_strict": 0,
+        "inst_loose": 0
+      },
+      {
+        "id": 1107,
+        "prompt_strict": false,
+        "prompt_loose": false,
+        "num_instructions": 2,
+        "inst_strict": 1,
+        "inst_loose": 1
+      },
+      {
+        "id": 1108,
+        "prompt_strict": true,
+        "prompt_loose": true,
+        "num_instructions": 1,
+        "inst_strict": 1,
+        "inst_loose": 1
+      },
+      {
+        "id": 1122,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 2,
@@ -228,7 +236,7 @@
         "inst_loose": 1
       },
       {
-        "id": 247,
+        "id": 1130,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 1,
@@ -244,7 +252,7 @@
         "inst_loose": 1
       },
       {
-        "id": 260,
+        "id": 1132,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 2,
@@ -268,7 +276,7 @@
         "inst_loose": 1
       },
       {
-        "id": 286,
+        "id": 1139,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 2,
@@ -284,7 +292,7 @@
         "inst_loose": 1
       },
       {
-        "id": 292,
+        "id": 1148,
         "prompt_strict": true,
         "prompt_loose": true,
         "num_instructions": 1,
@@ -308,7 +316,7 @@
         "inst_loose": 3
       },
       {
-        "id": 301,
+        "id": 1154,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 1,
@@ -332,7 +340,7 @@
         "inst_loose": 1
       },
       {
-        "id": 331,
+        "id": 1180,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 2,
@@ -364,15 +372,7 @@
         "inst_loose": 2
       },
       {
-        "id": 340,
-        "prompt_strict": false,
-        "prompt_loose": false,
-        "num_instructions": 2,
-        "inst_strict": 0,
-        "inst_loose": 0
-      },
-      {
-        "id": 343,
+        "id": 1217,
         "prompt_strict": true,
         "prompt_loose": true,
         "num_instructions": 1,
@@ -380,39 +380,7 @@
         "inst_loose": 1
       },
       {
-        "id": 349,
-        "prompt_strict": false,
-        "prompt_loose": false,
-        "num_instructions": 2,
-        "inst_strict": 0,
-        "inst_loose": 0
-      },
-      {
-        "id": 357,
-        "prompt_strict": true,
-        "prompt_loose": true,
-        "num_instructions": 1,
-        "inst_strict": 1,
-        "inst_loose": 1
-      },
-      {
-        "id": 371,
-        "prompt_strict": false,
-        "prompt_loose": false,
-        "num_instructions": 2,
-        "inst_strict": 1,
-        "inst_loose": 1
-      },
-      {
-        "id": 374,
-        "prompt_strict": false,
-        "prompt_loose": false,
-        "num_instructions": 2,
-        "inst_strict": 1,
-        "inst_loose": 1
-      },
-      {
-        "id": 1000,
+        "id": 1219,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 3,
@@ -420,7 +388,55 @@
         "inst_loose": 1
       },
       {
-        "id": 1001,
+        "id": 1220,
+        "prompt_strict": true,
+        "prompt_loose": true,
+        "num_instructions": 1,
+        "inst_strict": 1,
+        "inst_loose": 1
+      },
+      {
+        "id": 1233,
+        "prompt_strict": false,
+        "prompt_loose": false,
+        "num_instructions": 2,
+        "inst_strict": 1,
+        "inst_loose": 1
+      },
+      {
+        "id": 1236,
+        "prompt_strict": false,
+        "prompt_loose": false,
+        "num_instructions": 2,
+        "inst_strict": 1,
+        "inst_loose": 1
+      },
+      {
+        "id": 1237,
+        "prompt_strict": true,
+        "prompt_loose": true,
+        "num_instructions": 2,
+        "inst_strict": 2,
+        "inst_loose": 2
+      },
+      {
+        "id": 1242,
+        "prompt_strict": false,
+        "prompt_loose": false,
+        "num_instructions": 2,
+        "inst_strict": 1,
+        "inst_loose": 1
+      },
+      {
+        "id": 1246,
+        "prompt_strict": true,
+        "prompt_loose": true,
+        "num_instructions": 1,
+        "inst_strict": 1,
+        "inst_loose": 1
+      },
+      {
+        "id": 1248,
         "prompt_strict": false,
         "prompt_loose": false,
         "num_instructions": 1,
@@ -428,7 +444,7 @@
         "inst_loose": 0
       },
       {
-        "id": 1005,
+        "id": 1251,
         "prompt_strict": true,
         "prompt_loose": true,
         "num_instructions": 1,
@@ -9633,7 +9649,7 @@
       }
     ]
   },
-  "humaneval": {
+  "gsm8k": {
     "metrics": {
       "openai/openai_humaneval/accuracy": 0.5060975609756098,
       "openai/openai_humaneval/stderr": 0.039160110209191246
@@ -9708,19 +9724,19 @@
         "correct": true
       },
       {
-        "id": "HumanEval/113",
+        "id": "gsm8k_2e56ef42",
+        "correct": true
+      },
+      {
+        "id": "gsm8k_311256b2",
+        "correct": true
+      },
+      {
+        "id": "gsm8k_333acf5e",
         "correct": false
       },
       {
-        "id": "HumanEval/114",
-        "correct": false
-      },
-      {
-        "id": "HumanEval/115",
-        "correct": false
-      },
-      {
-        "id": "HumanEval/116",
+        "id": "gsm8k_352af31b",
         "correct": false
       },
       {
@@ -9728,7 +9744,7 @@
         "correct": true
       },
       {
-        "id": "HumanEval/118",
+        "id": "gsm8k_4014c2a5",
         "correct": false
       },
       {
@@ -9736,7 +9752,7 @@
         "correct": true
       },
       {
-        "id": "HumanEval/12",
+        "id": "gsm8k_4b7e54d8",
         "correct": true
       },
       {
@@ -9752,7 +9768,7 @@
         "correct": true
       },
       {
-        "id": "HumanEval/123",
+        "id": "gsm8k_6e11451d",
         "correct": false
       },
       {
@@ -9760,15 +9776,15 @@
         "correct": true
       },
       {
-        "id": "HumanEval/125",
+        "id": "gsm8k_772b703f",
         "correct": false
       },
       {
-        "id": "HumanEval/126",
-        "correct": false
+        "id": "gsm8k_7ee94a4c",
+        "correct": true
       },
       {
-        "id": "HumanEval/127",
+        "id": "gsm8k_7f41423b",
         "correct": false
       },
       {
@@ -9776,43 +9792,43 @@
         "correct": true
       },
       {
-        "id": "HumanEval/129",
-        "correct": false
-      },
-      {
-        "id": "HumanEval/13",
+        "id": "gsm8k_806b6177",
         "correct": true
       },
       {
-        "id": "HumanEval/130",
+        "id": "gsm8k_89a1a40c",
+        "correct": true
+      },
+      {
+        "id": "gsm8k_8ac51719",
         "correct": false
       },
       {
-        "id": "HumanEval/131",
+        "id": "gsm8k_8baa8980",
         "correct": false
       },
       {
-        "id": "HumanEval/132",
+        "id": "gsm8k_96805fca",
         "correct": false
       },
       {
-        "id": "HumanEval/133",
+        "id": "gsm8k_9f12ad97",
         "correct": false
       },
       {
-        "id": "HumanEval/134",
-        "correct": false
+        "id": "gsm8k_a0eef4f2",
+        "correct": true
       },
       {
-        "id": "HumanEval/135",
-        "correct": false
+        "id": "gsm8k_a2aad9f3",
+        "correct": true
       },
       {
         "id": "HumanEval/136",
         "correct": true
       },
       {
-        "id": "HumanEval/137",
+        "id": "gsm8k_a97b52af",
         "correct": false
       },
       {
@@ -9820,19 +9836,19 @@
         "correct": true
       },
       {
-        "id": "HumanEval/139",
-        "correct": false
-      },
-      {
-        "id": "HumanEval/14",
+        "id": "gsm8k_af9bef9a",
         "correct": true
       },
       {
-        "id": "HumanEval/140",
+        "id": "gsm8k_b2957718",
+        "correct": true
+      },
+      {
+        "id": "gsm8k_b4e85ecc",
         "correct": false
       },
       {
-        "id": "HumanEval/141",
+        "id": "gsm8k_b6320aa7",
         "correct": false
       },
       {
@@ -9840,35 +9856,35 @@
         "correct": true
       },
       {
-        "id": "HumanEval/143",
+        "id": "gsm8k_bfaa6fc5",
         "correct": false
       },
       {
-        "id": "HumanEval/144",
+        "id": "gsm8k_c695bff0",
         "correct": false
       },
       {
-        "id": "HumanEval/145",
+        "id": "gsm8k_c8d75bb0",
         "correct": false
       },
       {
-        "id": "HumanEval/146",
-        "correct": false
+        "id": "gsm8k_c971b7e9",
+        "correct": true
       },
       {
         "id": "HumanEval/147",
         "correct": true
       },
       {
-        "id": "HumanEval/148",
-        "correct": false
+        "id": "gsm8k_d5208707",
+        "correct": true
       },
       {
         "id": "HumanEval/149",
         "correct": true
       },
       {
-        "id": "HumanEval/15",
+        "id": "gsm8k_db23d31a",
         "correct": false
       },
       {
@@ -9888,11 +9904,11 @@
         "correct": true
       },
       {
-        "id": "HumanEval/154",
+        "id": "gsm8k_fbb884c1",
         "correct": false
       },
       {
-        "id": "HumanEval/155",
+        "id": "gsm8k_fdf442be",
         "correct": false
       },
       {
@@ -9900,24 +9916,24 @@
         "correct": true
       },
       {
-        "id": "HumanEval/157",
+        "id": "HumanEval/1",
         "correct": false
       },
       {
-        "id": "HumanEval/158",
+        "id": "HumanEval/10",
         "correct": false
       },
       {
-        "id": "HumanEval/159",
-        "correct": false
+        "id": "HumanEval/11",
+        "correct": true
       },
       {
         "id": "HumanEval/16",
         "correct": true
       },
       {
-        "id": "HumanEval/160",
-        "correct": false
+        "id": "HumanEval/13",
+        "correct": true
       },
       {
         "id": "HumanEval/161",
@@ -9928,8 +9944,8 @@
         "correct": true
       },
       {
-        "id": "HumanEval/163",
-        "correct": false
+        "id": "HumanEval/16",
+        "correct": true
       },
       {
         "id": "HumanEval/17",

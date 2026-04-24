@@ -68,6 +68,18 @@
   ],
   "base_model": "meta-llama/Llama-3.1-8B",
   "renderer_name": "role_colon",
+  "data_path": "data/my_mixed_training_data.jsonl",
+  "sampling_weights": {
+    "gsm8k": 1.4,
+    "ifeval": 1.0,
+    "code": 1.0
+  },
+  "stage2_sampling_weights": null,
+  "task_example_caps": {
+    "gsm8k": 7473,
+    "ifeval": 10000,
+    "code": 10000
+  },
   "training": {
     "num_steps": 200,
     "batch_size": 8,
