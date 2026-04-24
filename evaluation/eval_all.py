@@ -14,6 +14,8 @@ Usage:
 
 import argparse
 import asyncio
+import importlib
+import importlib.metadata
 import json
 import logging
 import os
@@ -28,6 +30,51 @@ from tinker_cookbook.model_info import get_recommended_renderer_name
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+REQUIRED_EVAL_VERSIONS = {
+    "inspect-ai": "0.3.170",
+    "inspect-evals": "0.3.106",
+    "openai": "2.30.0",
+    "torch": "2.7.0",
+    "transformers": "4.46.3",
+    "tokenizers": "0.20.3",
+    "huggingface-hub": "0.36.2",
+}
+
+
+def assert_eval_environment_ok():
+    issues = []
+    for pkg, expected in REQUIRED_EVAL_VERSIONS.items():
+        try:
+            installed = importlib.metadata.version(pkg)
+        except importlib.metadata.PackageNotFoundError:
+            issues.append(f"{pkg} not installed (expected {expected})")
+            continue
+        if installed != expected:
+            issues.append(f"{pkg}=={installed} installed, expected {expected}")
+
+    for mod in [
+        "openai",
+        "openai.types.shared_params.metadata",
+        "inspect_evals._registry",
+        "torch",
+        "transformers.models.auto.tokenization_auto",
+    ]:
+        try:
+            importlib.import_module(mod)
+        except Exception as exc:
+            issues.append(f"cannot import {mod}: {exc}")
+
+    if issues:
+        constraints = os.path.join(EVAL_DIR, "eval_env_constraints.txt")
+        fix_cmd = (
+            f'uv pip install --python "{sys.executable}" --force-reinstall -r "{constraints}"'
+        )
+        raise RuntimeError(
+            "Evaluation environment check failed:\n- "
+            + "\n- ".join(issues)
+            + "\n\nRun this to repair the env:\n"
+            + fix_cmd
+        )
 
 async def run_core(base_model, checkpoint_path, renderer_name, temperature,
                    top_p, limit, log_dir, verbose):
@@ -138,6 +185,8 @@ def save_json(path, data):
 
 
 def main():
+    assert_eval_environment_ok()
+
     p = argparse.ArgumentParser(description="Evaluate on core + optional tasks")
     p.add_argument("--base_models", type=str, nargs="+", default=None,
                     help="One or more base models to evaluate (e.g. meta-llama/Llama-3.2-3B)")

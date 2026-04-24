@@ -1,0 +1,17 @@
+{
+  "checkpoint_path": "tinker://ce353178-5516-5f06-89b8-25dd28bcc9ed:train:0/sampler_weights/sanity_1b_step_225",
+  "base_model": "meta-llama/Llama-3.1-8B",
+  "settings": {
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "ifeval": {
+    "error": "Error: No inspect tasks were found at the specified paths."
+  },
+  "gsm8k": {
+    "error": "[bold]ERROR[/bold]: OpenAI API requires optional dependencies. Install with:\n\n[bold]pip install openai[/bold]"
+  },
+  "humaneval": {
+    "error": "Error: No inspect tasks were found at the specified paths."
+  }
+}

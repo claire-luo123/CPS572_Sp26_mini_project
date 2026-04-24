@@ -14,6 +14,8 @@ Example:
 
 import argparse
 import asyncio
+import importlib
+import importlib.metadata
 import json
 import subprocess
 import sys
@@ -24,11 +26,58 @@ from typing import Any, Dict, List, Optional
 
 EVAL_DIR = Path(__file__).resolve().parent
 REPO_ROOT = EVAL_DIR.parent
+EVAL_ENV_CONSTRAINTS = EVAL_DIR / "eval_env_constraints.txt"
+REQUIRED_EVAL_VERSIONS = {
+    "inspect-ai": "0.3.170",
+    "inspect-evals": "0.3.106",
+    "openai": "2.30.0",
+    "torch": "2.7.0",
+    "transformers": "4.46.3",
+    "tokenizers": "0.20.3",
+    "huggingface-hub": "0.36.2",
+}
 
 
 def run_cmd(cmd: List[str], cwd: Path) -> None:
     print(f"\n>>> Running: {' '.join(cmd)}")
     subprocess.run(cmd, cwd=str(cwd), check=True)
+
+
+def assert_eval_environment_ok() -> None:
+    issues = []
+    for pkg, expected in REQUIRED_EVAL_VERSIONS.items():
+        try:
+            installed = importlib.metadata.version(pkg)
+        except importlib.metadata.PackageNotFoundError:
+            issues.append(f"{pkg} is not installed (expected {expected})")
+            continue
+        if installed != expected:
+            issues.append(f"{pkg}=={installed} installed, expected {expected}")
+
+    # Catch partially broken OpenAI installs (seen in prior runs).
+    module_checks = [
+        "openai",
+        "openai.types.shared_params.metadata",
+        "inspect_evals._registry",
+        "torch",
+        "transformers.models.auto.tokenization_auto",
+    ]
+    for mod in module_checks:
+        try:
+            importlib.import_module(mod)
+        except Exception as exc:
+            issues.append(f"cannot import {mod}: {exc}")
+
+    if issues:
+        fix_cmd = (
+            f'uv pip install --python "{sys.executable}" --force-reinstall -r "{EVAL_ENV_CONSTRAINTS}"'
+        )
+        raise RuntimeError(
+            "Evaluation environment check failed:\n- "
+            + "\n- ".join(issues)
+            + "\n\nRun this to repair the env:\n"
+            + fix_cmd
+        )
 
 
 def read_json(path: Path) -> Dict[str, Any]:
@@ -231,11 +280,19 @@ def extract_scores_from_task_results(task_results: Dict[str, Any]) -> Dict[str, 
 
 
 def main() -> None:
+    assert_eval_environment_ok()
+
     parser = argparse.ArgumentParser(description="One-command full training + evaluation pipeline")
     parser.add_argument("--num_steps", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--rank", type=int, default=32)
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override base model used for training (e.g. meta-llama/Llama-3.1-8B)",
+    )
     parser.add_argument("--checkpoint_name", type=str, default="sanity_1b")
     parser.add_argument("--checkpoint_every", type=int, default=25)
     parser.add_argument(
@@ -312,6 +369,8 @@ def main() -> None:
             str(args.checkpoint_every),
             "--no_publish",
         ]
+        if args.model:
+            train_cmd.extend(["--model", args.model])
         run_cmd(train_cmd, cwd=REPO_ROOT)
 
     checkpoint_info_path = Path(args.checkpoint_info_path).resolve()
@@ -446,11 +505,37 @@ def main() -> None:
             f"HumanEval={format_score(full_scores['humaneval_score'])}"
         )
 
-    # Keep backward-compatible "best" summary fields from top-1.
-    best_full = top_full_evaluations[0]
+    # Select best checkpoint by full-eval average score across headline metrics.
+    for row in top_full_evaluations:
+        row["full_average_score"] = average_available(
+            [
+                row["full_headline_scores"]["ifeval_score"],
+                row["full_headline_scores"]["gsm8k_accuracy"],
+                row["full_headline_scores"]["humaneval_score"],
+            ]
+        )
+
+    best_full = sorted(
+        top_full_evaluations,
+        key=lambda r: r["full_average_score"] if r["full_average_score"] is not None else -1.0,
+        reverse=True,
+    )[0]
+
+    print(
+        "Best checkpoint after full eval (top candidates): "
+        f"{best_full['name']} (avg={format_score(best_full['full_average_score'])})"
+    )
+
     final_submission_path = Path(best_full["full_submission_path"])
     final_submission = best_full["full_submission"]
     final_headline_scores = best_full["full_headline_scores"]
+    best = {
+        "checkpoint_name": best_full["name"],
+        "checkpoint_path": best_full["path"],
+        "step": best_full["step"],
+        "headline_scores": best_full["quick_headline_scores"],
+        "average_score": None,
+    }
 
     # 5) Optionally publish the best checkpoint.
     published = False
@@ -472,6 +557,7 @@ def main() -> None:
         "run_timestamp_utc": datetime.utcnow().isoformat() + "Z",
         "base_model": base_model,
         "training_args": {
+            "model_override": args.model,
             "num_steps": args.num_steps,
             "batch_size": args.batch_size,
             "lr": args.lr,
@@ -493,11 +579,13 @@ def main() -> None:
         },
         "quick_ranking": ranked,
         "best_checkpoint": {
-            "name": best["checkpoint_name"],
-            "path": best["checkpoint_path"],
-            "step": best["step"],
-            "quick_headline_scores": best["headline_scores"],
-            "quick_average_score": best["average_score"],
+            "name": best_full["name"],
+            "path": best_full["path"],
+            "step": best_full["step"],
+            "quick_headline_scores": best_full["quick_headline_scores"],
+            "quick_average_score": best_full["quick_average_score"],
+            "full_headline_scores": best_full["full_headline_scores"],
+            "full_average_score": best_full["full_average_score"],
         },
         "top_full_evaluations": top_full_evaluations,
         "final_evaluation": {

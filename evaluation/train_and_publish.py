@@ -31,7 +31,7 @@ from tinker_cookbook.tokenizer_utils import get_tokenizer
 
 # Default to 3B for stronger runs; switch back to 1B for cheaper iteration.
 # MODEL = "meta-llama/Llama-3.2-1B"
-MODEL = "meta-llama/Llama-3.2-3B"
+MODEL = "meta-llama/Llama-3.2-8B"
 # MODEL = "meta-llama/Llama-3.1-8B"    # Recommended for final submission
 
 # Longer contexts help code / long IF rows; raise carefully if you hit memory limits.
@@ -92,6 +92,12 @@ def _format_score(value):
 
 def main():
     parser = argparse.ArgumentParser(description="Train, save, and publish a checkpoint")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=MODEL,
+        help="Base model to train from (e.g. meta-llama/Llama-3.2-3B or meta-llama/Llama-3.1-8B)",
+    )
     parser.add_argument("--num_steps", type=int, default=2000, help="Number of training steps")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
@@ -115,13 +121,29 @@ def main():
         default=30,
         help="Sample limit per task for candidate checkpoint evaluation",
     )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for data shuffling")
+    parser.add_argument(
+        "--shuffle_data",
+        dest="shuffle_data",
+        action="store_true",
+        help="Shuffle training examples each pass through the dataset (default: enabled)",
+    )
+    parser.add_argument(
+        "--no_shuffle_data",
+        dest="shuffle_data",
+        action="store_false",
+        help="Disable data shuffling and use deterministic sequential order",
+    )
     parser.add_argument("--no_publish", action="store_true", help="Skip publishing")
+    parser.set_defaults(shuffle_data=True)
     args = parser.parse_args()
+    model_name = args.model
 
     # Setup
-    print(f"Model: {MODEL}")
-    tokenizer = get_tokenizer(MODEL)
-    renderer_name = model_info.get_recommended_renderer_name(MODEL)
+    print(f"Model: {model_name}")
+    print(f"Seed: {args.seed} | Shuffle data: {args.shuffle_data}")
+    tokenizer = get_tokenizer(model_name)
+    renderer_name = model_info.get_recommended_renderer_name(model_name)
     renderer = renderers.get_renderer(renderer_name, tokenizer)
     print(f"Renderer: {renderer_name}")
 
@@ -171,7 +193,7 @@ def main():
     # Create training client
     print(f"Creating LoRA training client (rank={args.rank})...")
     sc = tinker.ServiceClient()
-    tc = sc.create_lora_training_client(base_model=MODEL, rank=args.rank)
+    tc = sc.create_lora_training_client(base_model=model_name, rank=args.rank)
     print("  Training client ready")
 
     # Train
@@ -181,11 +203,23 @@ def main():
         print(f"Intermediate checkpoints enabled every {args.checkpoint_every} steps.")
 
     checkpoints = []
+    rng = np.random.default_rng(args.seed)
+    order = np.arange(len(all_data))
+    if args.shuffle_data:
+        rng.shuffle(order)
+    order_cursor = 0
 
     for step in range(args.num_steps):
-        # Cycle through data
-        start = (step * args.batch_size) % len(all_data)
-        batch = [all_data[i % len(all_data)] for i in range(start, start + args.batch_size)]
+        # Build each batch from a reproducible (optionally shuffled) index order.
+        batch_indices = []
+        for _ in range(args.batch_size):
+            if order_cursor >= len(order):
+                order_cursor = 0
+                if args.shuffle_data:
+                    rng.shuffle(order)
+            batch_indices.append(int(order[order_cursor]))
+            order_cursor += 1
+        batch = [all_data[i] for i in batch_indices]
 
         fwd_bwd_future = tc.forward_backward(batch, loss_fn="cross_entropy")
         optim_future = tc.optim_step(adam_params)
@@ -259,7 +293,7 @@ def main():
             print(f"\nRunning eval on candidate: {cp['name']} ({cp['path']})")
             _, task_results = asyncio.run(
                 run_core(
-                    base_model=MODEL,
+                    base_model=model_name,
                     checkpoint_path=cp["path"],
                     renderer_name=renderer_name,
                     temperature=0.0,
@@ -328,7 +362,7 @@ def main():
         "created_at": datetime.utcnow().isoformat() + "Z",
         "checkpoint_path": checkpoint_path,
         "checkpoints": checkpoints,
-        "base_model": MODEL,
+        "base_model": model_name,
         "renderer_name": renderer_name,
         "training": {
             "num_steps": args.num_steps,
@@ -337,6 +371,8 @@ def main():
             "lora_rank": args.rank,
             "max_seq_len": MAX_SEQ_LEN,
             "checkpoint_every": args.checkpoint_every,
+            "seed": args.seed,
+            "shuffle_data": args.shuffle_data,
         },
         "candidate_evaluation": candidate_eval,
         "published": not args.no_publish,
@@ -346,7 +382,7 @@ def main():
         json.dump(info, f, indent=2)
     print(f"\nCheckpoint info saved to {info_path}")
     print(f"\nNext: evaluate your checkpoint with")
-    print(f"  PYTHONPATH=. python evaluation/eval_all.py --checkpoint_path \"{checkpoint_path}\" --base_model {MODEL}")
+    print(f"  PYTHONPATH=. python evaluation/eval_all.py --checkpoint_path \"{checkpoint_path}\" --base_model {model_name}")
 
 if __name__ == "__main__":
     main()

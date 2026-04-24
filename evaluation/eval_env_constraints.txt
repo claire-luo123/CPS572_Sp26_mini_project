@@ -1,0 +1,7 @@
+inspect-ai==0.3.170
+inspect-evals==0.3.106
+openai==2.30.0
+torch==2.7.0
+transformers==4.46.3
+tokenizers==0.20.3
+huggingface-hub==0.36.2
