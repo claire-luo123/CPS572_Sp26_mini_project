@@ -59,22 +59,25 @@ def parse_caps(text):
     return caps
 
 
-def find_key(data, target_key):
-    if isinstance(data, dict):
-        if target_key in data:
-            return data[target_key]
-        for value in data.values():
-            result = find_key(value, target_key)
-            if result is not None:
-                return result
-    return None
+def _pick_metric(metrics, preferred_substrings):
+    for needle in preferred_substrings:
+        for key, value in metrics.items():
+            if needle in key.lower() and isinstance(value, (int, float)):
+                return float(value)
+    for value in metrics.values():
+        if isinstance(value, (int, float)):
+            return float(value)
+    return 0.0
 
 
 def parse_metrics(eval_results):
+    ifeval_metrics = eval_results.get("ifeval", {}).get("metrics", {})
+    gsm8k_metrics = eval_results.get("gsm8k", {}).get("metrics", {})
+    humaneval_metrics = eval_results.get("humaneval", {}).get("metrics", {})
     return {
-        "ifeval": float(find_key(eval_results, "google/IFEval/final_acc") or 0.0),
-        "gsm8k": float(find_key(eval_results, "openai/gsm8k/accuracy") or 0.0),
-        "humaneval": float(find_key(eval_results, "openai/openai_humaneval/accuracy") or 0.0),
+        "ifeval": _pick_metric(ifeval_metrics, ["prompt_level_strict", "accuracy", "acc"]),
+        "gsm8k": _pick_metric(gsm8k_metrics, ["accuracy", "acc", "exact_match"]),
+        "humaneval": _pick_metric(humaneval_metrics, ["pass@1", "accuracy", "acc"]),
     }
 
 

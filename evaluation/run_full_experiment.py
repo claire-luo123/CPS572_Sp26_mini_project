@@ -300,8 +300,6 @@ def extract_scores_from_task_results(task_results: Dict[str, Any]) -> Dict[str, 
 
 
 def main() -> None:
-    assert_eval_environment_ok()
-
     parser = argparse.ArgumentParser(description="One-command full training + evaluation pipeline")
     parser.add_argument(
         "--num_steps",
@@ -336,6 +334,18 @@ def main() -> None:
         type=int,
         default=1024,
         help="Passed to train_and_publish.py (1024 IF focus; 2048 longer code/context)",
+    )
+    parser.add_argument("--weight_gsm8k", type=float, default=1.0)
+    parser.add_argument("--weight_ifeval", type=float, default=1.0)
+    parser.add_argument("--weight_code", type=float, default=1.0)
+    parser.add_argument("--max_gsm8k_examples", type=int, default=0, help="0 means no cap")
+    parser.add_argument("--max_ifeval_examples", type=int, default=0, help="0 means no cap")
+    parser.add_argument("--max_code_examples", type=int, default=0, help="0 means no cap")
+    parser.add_argument(
+        "--save_every_steps",
+        type=int,
+        default=0,
+        help="Optional extra compatibility checkpoint cadence used by search scripts",
     )
     parser.add_argument(
         "--num_best_checkpoints",
@@ -383,6 +393,7 @@ def main() -> None:
         help="Publish only the selected best checkpoint at the end",
     )
     args = parser.parse_args()
+    assert_eval_environment_ok()
 
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     targets = {
@@ -419,6 +430,20 @@ def main() -> None:
             str(args.checkpoint_every),
             "--max_seq_len",
             str(args.max_seq_len),
+            "--weight_gsm8k",
+            str(args.weight_gsm8k),
+            "--weight_ifeval",
+            str(args.weight_ifeval),
+            "--weight_code",
+            str(args.weight_code),
+            "--max_gsm8k_examples",
+            str(args.max_gsm8k_examples),
+            "--max_ifeval_examples",
+            str(args.max_ifeval_examples),
+            "--max_code_examples",
+            str(args.max_code_examples),
+            "--save_every_steps",
+            str(args.save_every_steps),
             "--model",
             args.model,
             "--no_publish",
@@ -624,6 +649,13 @@ def main() -> None:
             "model_override": args.model,
             "train_data_path": args.train_data_path,
             "max_seq_len": args.max_seq_len,
+            "weight_gsm8k": args.weight_gsm8k,
+            "weight_ifeval": args.weight_ifeval,
+            "weight_code": args.weight_code,
+            "max_gsm8k_examples": args.max_gsm8k_examples,
+            "max_ifeval_examples": args.max_ifeval_examples,
+            "max_code_examples": args.max_code_examples,
+            "save_every_steps": args.save_every_steps,
             "num_steps": args.num_steps,
             "batch_size": args.batch_size,
             "lr": args.lr,
