@@ -1,199 +1,80 @@
 {
-  "created_at": "2026-04-24T06:07:46.318951Z",
-  "checkpoint_path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b",
+  "created_at": "2026-04-24T19:12:33.922111Z",
+  "checkpoint_path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b",
   "checkpoints": [
     {
-      "name": "sanity_1b_step_20",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_20",
-      "step": 20,
+      "name": "sanity_1b_step_25",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_25",
+      "step": 25,
       "type": "periodic",
-      "train_loss": 0.4370222554109566
+      "train_loss": 0.45193897647199505
     },
     {
-      "name": "sanity_1b_step_40",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_40",
-      "step": 40,
+      "name": "sanity_1b_step_50",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_50",
+      "step": 50,
       "type": "periodic",
-      "train_loss": 0.5523950768110809
+      "train_loss": 0.5856857555485483
     },
     {
-      "name": "sanity_1b_step_60",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_60",
-      "step": 60,
+      "name": "sanity_1b_step_75",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_75",
+      "step": 75,
       "type": "periodic",
-      "train_loss": 0.40794696231777333
-    },
-    {
-      "name": "sanity_1b_step_80",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_80",
-      "step": 80,
-      "type": "periodic",
-      "train_loss": 1.398076458866898
+      "train_loss": 0.3289650922768273
     },
     {
       "name": "sanity_1b_step_100",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_100",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_100",
       "step": 100,
       "type": "periodic",
-      "train_loss": 0.3084652814200507
+      "train_loss": 0.30351531495848894
     },
     {
-      "name": "sanity_1b_step_120",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_120",
-      "step": 120,
+      "name": "sanity_1b_step_125",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_125",
+      "step": 125,
       "type": "periodic",
-      "train_loss": 0.8608627873210258
+      "train_loss": 0.3189556973530225
     },
     {
-      "name": "sanity_1b_step_140",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_140",
-      "step": 140,
+      "name": "sanity_1b_step_150",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_150",
+      "step": 150,
       "type": "periodic",
-      "train_loss": 0.689221873458506
+      "train_loss": 0.3250033241926473
     },
     {
-      "name": "sanity_1b_step_160",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_160",
-      "step": 160,
+      "name": "sanity_1b_step_175",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_175",
+      "step": 175,
       "type": "periodic",
-      "train_loss": 1.330103289996941
-    },
-    {
-      "name": "sanity_1b_step_180",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_180",
-      "step": 180,
-      "type": "periodic",
-      "train_loss": 0.4183748177744604
+      "train_loss": 0.38953096446434554
     },
     {
       "name": "sanity_1b_step_200",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_200",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_200",
       "step": 200,
       "type": "periodic",
-      "train_loss": 0.5282546659477168
-    },
-    {
-      "name": "sanity_1b_step_220",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_220",
-      "step": 220,
-      "type": "periodic",
-      "train_loss": 0.4709612967952663
-    },
-    {
-      "name": "sanity_1b_step_240",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_240",
-      "step": 240,
-      "type": "periodic",
-      "train_loss": 0.33059965059586954
-    },
-    {
-      "name": "sanity_1b_step_260",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_260",
-      "step": 260,
-      "type": "periodic",
-      "train_loss": 0.23958482769906295
-    },
-    {
-      "name": "sanity_1b_step_280",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_280",
-      "step": 280,
-      "type": "periodic",
-      "train_loss": 1.3128413580643437
-    },
-    {
-      "name": "sanity_1b_step_300",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_300",
-      "step": 300,
-      "type": "periodic",
-      "train_loss": 0.5384445704567934
-    },
-    {
-      "name": "sanity_1b_step_320",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_320",
-      "step": 320,
-      "type": "periodic",
-      "train_loss": 0.9449382491454353
-    },
-    {
-      "name": "sanity_1b_step_340",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_340",
-      "step": 340,
-      "type": "periodic",
-      "train_loss": 0.33831706235721976
-    },
-    {
-      "name": "sanity_1b_step_360",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_360",
-      "step": 360,
-      "type": "periodic",
-      "train_loss": 0.44102118146088476
-    },
-    {
-      "name": "sanity_1b_step_380",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_380",
-      "step": 380,
-      "type": "periodic",
-      "train_loss": 0.6737011023765549
-    },
-    {
-      "name": "sanity_1b_step_400",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_400",
-      "step": 400,
-      "type": "periodic",
-      "train_loss": 0.4254023962498822
-    },
-    {
-      "name": "sanity_1b_step_420",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_420",
-      "step": 420,
-      "type": "periodic",
-      "train_loss": 0.5861393555362774
-    },
-    {
-      "name": "sanity_1b_step_440",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_440",
-      "step": 440,
-      "type": "periodic",
-      "train_loss": 0.3417588320085029
-    },
-    {
-      "name": "sanity_1b_step_460",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_460",
-      "step": 460,
-      "type": "periodic",
-      "train_loss": 0.3264130471759026
-    },
-    {
-      "name": "sanity_1b_step_480",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_480",
-      "step": 480,
-      "type": "periodic",
-      "train_loss": 0.7014405060020718
-    },
-    {
-      "name": "sanity_1b_step_500",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_500",
-      "step": 500,
-      "type": "periodic",
-      "train_loss": 0.7384750275817631
+      "train_loss": 0.4874089907038879
     },
     {
       "name": "sanity_1b",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b",
-      "step": 500,
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b",
+      "step": 200,
       "type": "final",
-      "train_loss": 0.7384750275817631
+      "train_loss": 0.4874089907038879
     }
   ],
   "base_model": "meta-llama/Llama-3.1-8B",
   "renderer_name": "role_colon",
   "training": {
-    "num_steps": 500,
+    "num_steps": 200,
     "batch_size": 8,
     "learning_rate": 8e-05,
     "lora_rank": 64,
-    "max_seq_len": 1024,
-    "checkpoint_every": 20,
+    "max_seq_len": 2048,
+    "checkpoint_every": 25,
     "seed": 42,
     "shuffle_data": true
   },
@@ -201,59 +82,59 @@
     "top_k": 3,
     "eval_limit": 30,
     "candidates": [
-      "sanity_1b_step_260",
       "sanity_1b_step_100",
-      "sanity_1b_step_460"
+      "sanity_1b_step_125",
+      "sanity_1b_step_150"
     ],
     "ranked_results": [
       {
-        "name": "sanity_1b_step_260",
-        "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_260",
-        "step": 260,
-        "train_loss": 0.23958482769906295,
+        "name": "sanity_1b_step_125",
+        "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_125",
+        "step": 125,
+        "train_loss": 0.3189556973530225,
         "headline_scores": {
-          "ifeval_score": 0.26666666666666666,
-          "gsm8k_accuracy": 0.5333333333333333,
-          "humaneval_score": 0.7
+          "ifeval_score": 0.16666666666666666,
+          "gsm8k_accuracy": 0.5666666666666667,
+          "humaneval_score": 0.6666666666666666
         },
-        "average_score": 0.5
-      },
-      {
-        "name": "sanity_1b_step_460",
-        "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_460",
-        "step": 460,
-        "train_loss": 0.3264130471759026,
-        "headline_scores": {
-          "ifeval_score": 0.3,
-          "gsm8k_accuracy": 0.5333333333333333,
-          "humaneval_score": 0.6333333333333333
-        },
-        "average_score": 0.4888888888888889
+        "average_score": 0.4666666666666666
       },
       {
         "name": "sanity_1b_step_100",
-        "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_100",
+        "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_100",
         "step": 100,
-        "train_loss": 0.3084652814200507,
+        "train_loss": 0.30351531495848894,
         "headline_scores": {
-          "ifeval_score": 0.26666666666666666,
-          "gsm8k_accuracy": 0.3333333333333333,
-          "humaneval_score": 0.5666666666666667
+          "ifeval_score": 0.23333333333333334,
+          "gsm8k_accuracy": 0.4666666666666667,
+          "humaneval_score": 0.6666666666666666
         },
-        "average_score": 0.38888888888888884
+        "average_score": 0.45555555555555555
+      },
+      {
+        "name": "sanity_1b_step_150",
+        "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_150",
+        "step": 150,
+        "train_loss": 0.3250033241926473,
+        "headline_scores": {
+          "ifeval_score": 0.2,
+          "gsm8k_accuracy": 0.5,
+          "humaneval_score": 0.6666666666666666
+        },
+        "average_score": 0.45555555555555555
       }
     ],
     "best_candidate": {
-      "name": "sanity_1b_step_260",
-      "path": "tinker://2e906d1d-b2e9-59fb-9c1b-8acd97691780:train:0/sampler_weights/sanity_1b_step_260",
-      "step": 260,
-      "train_loss": 0.23958482769906295,
+      "name": "sanity_1b_step_125",
+      "path": "tinker://a929a1f9-e027-5a08-a9bf-a142a4ae38e4:train:0/sampler_weights/sanity_1b_step_125",
+      "step": 125,
+      "train_loss": 0.3189556973530225,
       "headline_scores": {
-        "ifeval_score": 0.26666666666666666,
-        "gsm8k_accuracy": 0.5333333333333333,
-        "humaneval_score": 0.7
+        "ifeval_score": 0.16666666666666666,
+        "gsm8k_accuracy": 0.5666666666666667,
+        "humaneval_score": 0.6666666666666666
       },
-      "average_score": 0.5
+      "average_score": 0.4666666666666666
     }
   },
   "published": false
