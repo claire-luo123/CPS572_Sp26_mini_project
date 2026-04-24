@@ -32,9 +32,8 @@ from tinker_cookbook.tokenizer_utils import get_tokenizer
 # Default submission model; override with --model.
 MODEL = "meta-llama/Llama-3.1-8B"
 
-# Default max sequence length for tokenization (override with --max_seq_len).
-# Use 1024 for IF-heavy focus; 2048 if you need longer code / multi-turn contexts (more VRAM).
-DEFAULT_MAX_SEQ_LEN = 1024
+# Longer contexts help code / long IF rows; raise carefully if you hit memory limits.
+MAX_SEQ_LEN = 2048
 
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -118,6 +117,12 @@ def main():
     )
     parser.add_argument("--checkpoint_name", type=str, default="mixed_sft_1b", help="Checkpoint name")
     parser.add_argument(
+        "--data_path",
+        type=str,
+        default=None,
+        help="Optional path to training JSONL (defaults to data/my_mixed_training_data.jsonl)",
+    )
+    parser.add_argument(
         "--checkpoint_every",
         type=int,
         default=25,
@@ -179,11 +184,8 @@ def main():
     all_conversations = []
     
     data_path = args.data_path or os.path.join(EVAL_DIR, "..", "data", "my_mixed_training_data.jsonl")
-    data_path = os.path.abspath(data_path)
-    if not os.path.isfile(data_path):
-        raise FileNotFoundError(f"Training data not found: {data_path}")
-
     print(f"Training data path: {data_path}")
+    
     with open(data_path, "r") as f:
         for line in f:
             row = json.loads(line)
