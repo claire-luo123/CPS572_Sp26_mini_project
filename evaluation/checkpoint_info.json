@@ -1,25 +1,165 @@
 {
-  "created_at": "2026-04-24T22:12:32.880249Z",
-  "checkpoint_path": "tinker://26dc0c0e-20b0-5f50-b824-681b88c2a88d:train:0/sampler_weights/smoke_exp",
+  "created_at": "2026-04-24T23:14:03.354997Z",
+  "checkpoint_path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b",
   "checkpoints": [
     {
-      "name": "smoke_exp",
-      "path": "tinker://26dc0c0e-20b0-5f50-b824-681b88c2a88d:train:0/sampler_weights/smoke_exp",
-      "step": 3,
+      "name": "sanity_1b_step_25",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_25",
+      "step": 25,
+      "type": "periodic",
+      "train_loss": 0.6826940250572225
+    },
+    {
+      "name": "sanity_1b_step_50",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_50",
+      "step": 50,
+      "type": "periodic",
+      "train_loss": 0.9960949273524607
+    },
+    {
+      "name": "sanity_1b_step_75",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_75",
+      "step": 75,
+      "type": "periodic",
+      "train_loss": 0.8045083794334078
+    },
+    {
+      "name": "sanity_1b_step_100",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_100",
+      "step": 100,
+      "type": "periodic",
+      "train_loss": 0.5775796850635802
+    },
+    {
+      "name": "sanity_1b_step_125",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_125",
+      "step": 125,
+      "type": "periodic",
+      "train_loss": 0.29558470117346547
+    },
+    {
+      "name": "sanity_1b_step_150",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_150",
+      "step": 150,
+      "type": "periodic",
+      "train_loss": 0.9647245509198951
+    },
+    {
+      "name": "sanity_1b_step_175",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_175",
+      "step": 175,
+      "type": "periodic",
+      "train_loss": 1.0662357575949948
+    },
+    {
+      "name": "sanity_1b_step_200",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_200",
+      "step": 200,
+      "type": "periodic",
+      "train_loss": 0.4419299576916298
+    },
+    {
+      "name": "sanity_1b_step_225",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_225",
+      "step": 225,
+      "type": "periodic",
+      "train_loss": 0.1899784421521069
+    },
+    {
+      "name": "sanity_1b_step_250",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_250",
+      "step": 250,
+      "type": "periodic",
+      "train_loss": 0.6099450279394929
+    },
+    {
+      "name": "sanity_1b_step_275",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_275",
+      "step": 275,
+      "type": "periodic",
+      "train_loss": 0.6875437456045017
+    },
+    {
+      "name": "sanity_1b_step_300",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_300",
+      "step": 300,
+      "type": "periodic",
+      "train_loss": 0.6818901869598565
+    },
+    {
+      "name": "sanity_1b_step_325",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_325",
+      "step": 325,
+      "type": "periodic",
+      "train_loss": 0.4527933488452526
+    },
+    {
+      "name": "sanity_1b_step_350",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_350",
+      "step": 350,
+      "type": "periodic",
+      "train_loss": 0.40649363193237836
+    },
+    {
+      "name": "sanity_1b_step_375",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_375",
+      "step": 375,
+      "type": "periodic",
+      "train_loss": 0.5323076501729324
+    },
+    {
+      "name": "sanity_1b_step_400",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_400",
+      "step": 400,
+      "type": "periodic",
+      "train_loss": 0.30884043301128256
+    },
+    {
+      "name": "sanity_1b_step_425",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_425",
+      "step": 425,
+      "type": "periodic",
+      "train_loss": 0.6355786500202484
+    },
+    {
+      "name": "sanity_1b_step_450",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_450",
+      "step": 450,
+      "type": "periodic",
+      "train_loss": 0.5510723198289902
+    },
+    {
+      "name": "sanity_1b_step_475",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_475",
+      "step": 475,
+      "type": "periodic",
+      "train_loss": 0.33770400235068576
+    },
+    {
+      "name": "sanity_1b_step_500",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b_step_500",
+      "step": 500,
+      "type": "periodic",
+      "train_loss": 0.27652698932684155
+    },
+    {
+      "name": "sanity_1b",
+      "path": "tinker://1a2515ff-a5c7-52d7-a329-d94a6eb2e6dd:train:0/sampler_weights/sanity_1b",
+      "step": 500,
       "type": "final",
-      "train_loss": 0.7554456155439978
+      "train_loss": 0.27652698932684155
     }
   ],
   "base_model": "meta-llama/Llama-3.1-8B",
   "renderer_name": "role_colon",
   "training": {
     "data_path": "/Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/data/my_mixed_training_data.jsonl",
-    "num_steps": 3,
-    "batch_size": 2,
-    "learning_rate": 8e-05,
-    "lora_rank": 64,
+    "num_steps": 500,
+    "batch_size": 4,
+    "learning_rate": 0.0001,
+    "lora_rank": 32,
     "max_seq_len": 1024,
-    "checkpoint_every": 0,
+    "checkpoint_every": 25,
     "seed": 42,
     "shuffle_data": true
   },

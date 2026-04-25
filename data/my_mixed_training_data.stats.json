@@ -3,9 +3,9 @@
   "seed": 42,
   "counts": {
     "gsm8k": 7473,
-    "ifeval": 12000,
-    "code": 12000,
-    "total": 31473
+    "ifeval": 10000,
+    "code": 10000,
+    "total": 27473
   },
   "datasets": {
     "gsm8k": {
@@ -15,27 +15,27 @@
     },
     "ifeval": {
       "dataset": "allenai/tulu-3-sft-mixture",
-      "candidate_pool": 72000,
-      "candidate_rows": 72000,
-      "rejected_refusal": 3167,
-      "rejected_non_ascii_prompt": 4945,
-      "rejected_answer_length": 6359,
-      "rejected_prompt_length": 3656,
-      "rejected_no_single_turn": 49,
-      "rejected_duplicate_prompt": 531,
-      "selected": 12000,
-      "scored_candidates": 53293
+      "candidate_pool": 60000,
+      "candidate_rows": 60000,
+      "rejected_refusal": 2677,
+      "rejected_non_ascii_prompt": 4090,
+      "rejected_answer_length": 5314,
+      "rejected_prompt_length": 3041,
+      "rejected_no_single_turn": 39,
+      "rejected_duplicate_prompt": 387,
+      "selected": 10000,
+      "scored_candidates": 44452
     },
     "code": {
       "dataset": "nvidia/OpenCodeInstruct",
-      "candidate_pool": 72000,
-      "candidate_rows": 72000,
-      "rejected_not_python": 274,
-      "rejected_prompt_length": 28,
-      "rejected_duplicate_prompt": 171,
-      "rejected_output_length": 6,
-      "selected": 12000,
-      "scored_candidates": 71521
+      "candidate_pool": 60000,
+      "candidate_rows": 60000,
+      "rejected_not_python": 230,
+      "rejected_prompt_length": 26,
+      "rejected_duplicate_prompt": 125,
+      "rejected_output_length": 5,
+      "selected": 10000,
+      "scored_candidates": 59614
     }
   }
 }
