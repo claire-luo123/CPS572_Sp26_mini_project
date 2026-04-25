@@ -378,6 +378,20 @@ def main():
         default=DEFAULT_CANDIDATE_MULTIPLIER,
         help="How many random candidates to inspect per kept IF/code example",
     )
+    parser.add_argument(
+        "--extra_jsonl",
+        action="append",
+        default=[],
+        help="Path to an additional pre-built JSONL of {'messages': [...]} rows "
+             "to mix into the final training file (use multiple times for multiple files). "
+             "Useful for synthetic IFEval data from data/build_synthetic_ifeval.py.",
+    )
+    parser.add_argument(
+        "--extra_repeat",
+        type=int,
+        default=1,
+        help="Repeat extra JSONL rows N times when concatenating (cheap upweight).",
+    )
     args = parser.parse_args()
 
     gsm8k_records, gsm8k_stats = prepare_gsm8k(args.max_gsm8k_examples, args.seed)
@@ -392,7 +406,34 @@ def main():
         candidate_multiplier=args.candidate_multiplier,
     )
 
-    all_records = gsm8k_records + if_records + code_records
+    extra_records = []
+    extra_stats = {}
+    for path in args.extra_jsonl:
+        if not os.path.exists(path):
+            print(f"WARNING: extra_jsonl file not found, skipping: {path}")
+            continue
+        loaded = 0
+        with open(path, "r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    continue
+                if "messages" not in row:
+                    continue
+                extra_records.append({"messages": row["messages"]})
+                loaded += 1
+        if args.extra_repeat > 1 and loaded:
+            base = list(extra_records[-loaded:])
+            for _ in range(args.extra_repeat - 1):
+                extra_records.extend(base)
+        extra_stats[path] = {"loaded_rows": loaded, "after_repeat": loaded * args.extra_repeat}
+        print(f"Loaded {loaded} extra rows from {path} (repeat={args.extra_repeat})")
+
+    all_records = gsm8k_records + if_records + code_records + extra_records
     write_jsonl(args.output_path, all_records)
 
     summary = {
@@ -402,12 +443,14 @@ def main():
             "gsm8k": len(gsm8k_records),
             "ifeval": len(if_records),
             "code": len(code_records),
+            "extra": len(extra_records),
             "total": len(all_records),
         },
         "datasets": {
             "gsm8k": gsm8k_stats,
             "ifeval": if_stats,
             "code": code_stats,
+            "extra": extra_stats,
         },
     }
     summary_path = stats_path_for(args.output_path)

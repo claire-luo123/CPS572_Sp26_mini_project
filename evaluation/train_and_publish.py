@@ -19,6 +19,7 @@ Usage:
 import argparse
 import asyncio
 import json
+import math
 import os
 from datetime import datetime
 
@@ -28,6 +29,39 @@ from tinker import types
 from tinker_cookbook import model_info, renderers
 from tinker_cookbook.supervised.data import conversation_to_datum
 from tinker_cookbook.tokenizer_utils import get_tokenizer
+
+
+def cosine_lr(step, total_steps, base_lr, warmup_frac=0.05, min_lr_frac=0.1):
+    """Cosine LR schedule with linear warmup. Prevents the late-step IF collapse
+    we see at constant LR (e.g. step 475 IFEval drop in 20260424_223215)."""
+    warmup = max(1, int(round(warmup_frac * total_steps)))
+    if step < warmup:
+        return base_lr * (step + 1) / warmup
+    progress = (step - warmup) / max(1, total_steps - warmup)
+    progress = min(max(progress, 0.0), 1.0)
+    return base_lr * (min_lr_frac + (1.0 - min_lr_frac) * 0.5 * (1.0 + math.cos(math.pi * progress)))
+
+
+def classify_conversation(convo):
+    """Return one of 'gsm8k', 'ifeval', 'code', 'other' so we can sample by task
+    in the two-stage curriculum."""
+    user_text = ""
+    assistant_text = ""
+    for msg in convo:
+        role = msg.get("role") if isinstance(msg, dict) else None
+        content = msg.get("content", "") if isinstance(msg, dict) else ""
+        if role == "user" and not user_text:
+            user_text = content or ""
+        elif role == "assistant" and not assistant_text:
+            assistant_text = content or ""
+    a = (assistant_text or "").strip()
+    if "####" in a and any(ch.isdigit() for ch in a[-40:]):
+        return "gsm8k"
+    if "def " in a or a.lstrip().startswith(("def ", "import ", "from ", "class ", "#")):
+        return "code"
+    if user_text:
+        return "ifeval"
+    return "other"
 
 # Default submission model; override with --model.
 MODEL = "meta-llama/Llama-3.1-8B"
@@ -63,10 +97,15 @@ def _extract_headline_scores(task_results):
         "ifeval_score": _pick_metric(
             ifeval_metrics,
             [
+                "final_acc",
                 "prompt_level_strict",
+                "prompt_strict",
                 "prompt_level_loose",
+                "prompt_loose",
                 "inst_level_strict",
+                "inst_strict",
                 "inst_level_loose",
+                "inst_loose",
                 "accuracy",
                 "acc",
             ],
@@ -161,7 +200,30 @@ def main():
         default=DEFAULT_MAX_SEQ_LEN,
         help="Max sequence length for tokenization (1024 IF focus; 2048 longer code/context)",
     )
-    parser.set_defaults(shuffle_data=True)
+    parser.add_argument(
+        "--use_cosine_lr",
+        dest="use_cosine_lr",
+        action="store_true",
+        help="Use cosine LR schedule with linear warmup (default: enabled).",
+    )
+    parser.add_argument(
+        "--no_cosine_lr",
+        dest="use_cosine_lr",
+        action="store_false",
+        help="Use constant learning rate (legacy behavior).",
+    )
+    parser.add_argument("--lr_warmup_frac", type=float, default=0.05,
+                        help="Fraction of steps used for linear warmup (default 0.05)")
+    parser.add_argument("--lr_min_frac", type=float, default=0.1,
+                        help="Cosine schedule floor (final LR = base_lr * lr_min_frac)")
+    parser.add_argument("--stage2_fraction", type=float, default=0.0,
+                        help="Two-stage curriculum: fraction of steps at the END that "
+                             "should sample IFEval-heavy batches (e.g. 0.25 = last 25%%). "
+                             "0.0 disables the curriculum.")
+    parser.add_argument("--stage2_if_weight", type=float, default=0.8,
+                        help="In stage 2, probability each batch slot is filled from the "
+                             "IF pool (default 0.8 = 80%% IF, 20%% other tasks).")
+    parser.set_defaults(shuffle_data=True, use_cosine_lr=True)
     args = parser.parse_args()
     model_name = args.model
     max_seq_len = int(args.max_seq_len)
@@ -184,29 +246,37 @@ def main():
         raise FileNotFoundError(f"Training data not found: {data_path}")
 
     print(f"Training data path: {data_path}")
+    conversation_tasks = []
     with open(data_path, "r") as f:
         for line in f:
             row = json.loads(line)
-            # Map GSM8K format
+            convo = None
+            task = None
             if "question" in row and "answer" in row:
-                all_conversations.append([
+                convo = [
                     {"role": "user", "content": row["question"]},
-                    {"role": "assistant", "content": row["answer"]}
-                ])
-            # Map Tulu format
+                    {"role": "assistant", "content": row["answer"]},
+                ]
+                task = "gsm8k"
             elif "messages" in row:
-                all_conversations.append(row["messages"])
-            # Map Code format (Instruction/Output)
+                convo = row["messages"]
+                task = (row.get("task") if isinstance(row, dict) else None) or "ifeval"
             elif "instruction" in row and "output" in row:
-                all_conversations.append([
+                convo = [
                     {"role": "user", "content": row["instruction"]},
-                    {"role": "assistant", "content": row["output"]}
-                ])
+                    {"role": "assistant", "content": row["output"]},
+                ]
+                task = "code"
+            if convo is None:
+                continue
+            all_conversations.append(convo)
+            conversation_tasks.append(task)
 
-    # Prepare training data
+    # Tokenize. Drop rows that fail conversation_to_datum, but keep the task tag aligned.
     print(f"Tokenizing training data (max_length={max_seq_len})...")
     all_data = []
-    for convo in all_conversations:
+    all_tasks = []
+    for convo, task in zip(all_conversations, conversation_tasks):
         try:
             datum = conversation_to_datum(
                 convo,
@@ -214,11 +284,25 @@ def main():
                 max_length=max_seq_len,
                 train_on_what=renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES,
             )
-            all_data.append(datum)
-        except Exception as e:
-            continue # Skip any malformed data rows
-            
+        except Exception:
+            continue
+        all_data.append(datum)
+        all_tasks.append(task)
+
+    task_counts = {t: all_tasks.count(t) for t in set(all_tasks)}
     print(f"  {len(all_data)} training examples prepared and tokenized!")
+    print(f"  Task mix: {task_counts}")
+
+    # Per-task index pools for the two-stage curriculum sampler.
+    task_pools = {"ifeval": [], "gsm8k": [], "code": [], "other": []}
+    for idx, t in enumerate(all_tasks):
+        task_pools.setdefault(t, []).append(idx)
+    if not task_pools.get("ifeval"):
+        # Fallback so curriculum doesn't crash on a code/gsm8k-only file.
+        task_pools["ifeval"] = list(range(len(all_data)))
+    other_pool = task_pools.get("gsm8k", []) + task_pools.get("code", []) + task_pools.get("other", [])
+    if not other_pool:
+        other_pool = list(range(len(all_data)))
 
     # Create training client
     print(f"Creating LoRA training client (rank={args.rank})...")
@@ -227,29 +311,72 @@ def main():
     print("  Training client ready")
 
     # Train
-    adam_params = types.AdamParams(learning_rate=args.lr, beta1=0.9, beta2=0.95, eps=1e-8)
-    print(f"\nTraining for {args.num_steps} steps (batch_size={args.batch_size}, lr={args.lr})...")
+    print(f"\nTraining for {args.num_steps} steps (batch_size={args.batch_size}, base_lr={args.lr})...")
+    if args.use_cosine_lr:
+        print(f"  LR schedule: cosine, warmup_frac={args.lr_warmup_frac}, min_lr_frac={args.lr_min_frac}")
+    else:
+        print(f"  LR schedule: constant lr={args.lr}")
+    if args.stage2_fraction and args.stage2_fraction > 0:
+        stage2_start_step = int(round(args.num_steps * (1.0 - args.stage2_fraction)))
+        print(
+            f"  Curriculum: stage 1 = steps 0..{stage2_start_step}, "
+            f"stage 2 = steps {stage2_start_step}..{args.num_steps} "
+            f"(IF weight = {args.stage2_if_weight})"
+        )
+    else:
+        stage2_start_step = args.num_steps + 1  # never trigger
+        print("  Curriculum: disabled (stage2_fraction=0)")
     if args.checkpoint_every > 0:
-        print(f"Intermediate checkpoints enabled every {args.checkpoint_every} steps.")
+        print(f"  Intermediate checkpoints every {args.checkpoint_every} steps.")
 
     checkpoints = []
     rng = np.random.default_rng(args.seed)
+    py_rng = np.random.default_rng(args.seed + 1)
     order = np.arange(len(all_data))
     if args.shuffle_data:
         rng.shuffle(order)
     order_cursor = 0
 
+    if_pool_arr = np.array(task_pools["ifeval"], dtype=np.int64) if task_pools.get("ifeval") else np.array([], dtype=np.int64)
+    other_pool_arr = np.array(other_pool, dtype=np.int64)
+
     for step in range(args.num_steps):
-        # Build each batch from a reproducible (optionally shuffled) index order.
-        batch_indices = []
-        for _ in range(args.batch_size):
-            if order_cursor >= len(order):
-                order_cursor = 0
-                if args.shuffle_data:
-                    rng.shuffle(order)
-            batch_indices.append(int(order[order_cursor]))
-            order_cursor += 1
+        in_stage2 = step >= stage2_start_step
+
+        if in_stage2 and len(if_pool_arr) > 0 and args.stage2_if_weight > 0:
+            # Curriculum batch: each slot drawn from IF pool with prob stage2_if_weight,
+            # else from the rest. Sampling with replacement avoids edge cases on small pools.
+            picks = py_rng.random(args.batch_size) < args.stage2_if_weight
+            batch_indices = [
+                int(if_pool_arr[py_rng.integers(0, len(if_pool_arr))]) if pick
+                else int(other_pool_arr[py_rng.integers(0, len(other_pool_arr))])
+                for pick in picks
+            ]
+        else:
+            # Normal stage-1 batches: walk the (optionally shuffled) order.
+            batch_indices = []
+            for _ in range(args.batch_size):
+                if order_cursor >= len(order):
+                    order_cursor = 0
+                    if args.shuffle_data:
+                        rng.shuffle(order)
+                batch_indices.append(int(order[order_cursor]))
+                order_cursor += 1
+
         batch = [all_data[i] for i in batch_indices]
+
+        # Cosine LR (or constant if --no_cosine_lr): build AdamParams per step.
+        if args.use_cosine_lr:
+            current_lr = cosine_lr(
+                step,
+                args.num_steps,
+                args.lr,
+                warmup_frac=args.lr_warmup_frac,
+                min_lr_frac=args.lr_min_frac,
+            )
+        else:
+            current_lr = args.lr
+        adam_params = types.AdamParams(learning_rate=current_lr, beta1=0.9, beta2=0.95, eps=1e-8)
 
         fwd_bwd_future = tc.forward_backward(batch, loss_fn="cross_entropy")
         optim_future = tc.optim_step(adam_params)
@@ -260,39 +387,62 @@ def main():
         # Compute loss
         logprobs = np.concatenate([o["logprobs"].tolist() for o in fwd_bwd_result.loss_fn_outputs])
         weights = np.concatenate([d.loss_fn_inputs["weights"].tolist() for d in batch])
-        loss = -np.dot(logprobs, weights) / max(weights.sum(), 1)
-        
-        # Only print every 10 steps so it doesn't spam your terminal
-        if step % 10 == 0 or step == args.num_steps - 1:
-            print(f"  Step {step+1}/{args.num_steps} | Loss: {loss:.4f}")
+        loss = -np.dot(logprobs, weights) / max(float(weights.sum()), 1.0)
 
-        # Save periodic checkpoint if requested
+        if step % 10 == 0 or step == args.num_steps - 1:
+            stage_tag = "S2" if in_stage2 else "S1"
+            print(
+                f"  Step {step+1}/{args.num_steps} [{stage_tag}] | "
+                f"lr={current_lr:.2e} | Loss: {loss:.4f}"
+            )
+
+        # Save periodic checkpoint if requested.
+        # We save BOTH a sampler-weights checkpoint (for inference / eval) AND
+        # a state checkpoint (the only kind that the cookbook RL recipes can
+        # load via `create_training_client_from_state`). Without state saving
+        # there's no way to seed GRPO from this SFT run.
         step_num = step + 1
         if args.checkpoint_every > 0 and step_num % args.checkpoint_every == 0:
             periodic_name = f"{args.checkpoint_name}_step_{step_num}"
             print(f"\nSaving periodic checkpoint '{periodic_name}'...")
             ckpt = tc.save_weights_for_sampler(name=periodic_name).result()
             periodic_path = ckpt.path
-            print(f"  Periodic checkpoint saved: {periodic_path}")
+            print(f"  Periodic sampler ckpt: {periodic_path}")
+            try:
+                state_ckpt = tc.save_state(name=periodic_name).result()
+                state_path = state_ckpt.path
+                print(f"  Periodic state ckpt:   {state_path}")
+            except Exception as e:
+                state_path = None
+                print(f"  WARNING: save_state failed for {periodic_name}: {e}")
             checkpoints.append(
                 {
                     "name": periodic_name,
                     "path": periodic_path,
+                    "state_path": state_path,
                     "step": step_num,
                     "type": "periodic",
                     "train_loss": float(loss),
                 }
             )
 
-    # Save checkpoint
+    # Save final checkpoint (both flavors).
     print(f"\nSaving checkpoint '{args.checkpoint_name}'...")
     ckpt = tc.save_weights_for_sampler(name=args.checkpoint_name).result()
     checkpoint_path = ckpt.path
-    print(f"  Checkpoint saved: {checkpoint_path}")
+    print(f"  Final sampler ckpt: {checkpoint_path}")
+    try:
+        state_ckpt = tc.save_state(name=args.checkpoint_name).result()
+        final_state_path = state_ckpt.path
+        print(f"  Final state ckpt:   {final_state_path}")
+    except Exception as e:
+        final_state_path = None
+        print(f"  WARNING: save_state failed for {args.checkpoint_name}: {e}")
     checkpoints.append(
         {
             "name": args.checkpoint_name,
             "path": checkpoint_path,
+            "state_path": final_state_path,
             "step": args.num_steps,
             "type": "final",
             "train_loss": float(loss),
@@ -391,6 +541,7 @@ def main():
     info = {
         "created_at": datetime.utcnow().isoformat() + "Z",
         "checkpoint_path": checkpoint_path,
+        "state_path": final_state_path,
         "checkpoints": checkpoints,
         "base_model": model_name,
         "renderer_name": renderer_name,
@@ -404,6 +555,12 @@ def main():
             "checkpoint_every": args.checkpoint_every,
             "seed": args.seed,
             "shuffle_data": args.shuffle_data,
+            "use_cosine_lr": args.use_cosine_lr,
+            "lr_warmup_frac": args.lr_warmup_frac,
+            "lr_min_frac": args.lr_min_frac,
+            "stage2_fraction": args.stage2_fraction,
+            "stage2_if_weight": args.stage2_if_weight,
+            "task_counts": task_counts,
         },
         "candidate_evaluation": candidate_eval,
         "published": not args.no_publish,

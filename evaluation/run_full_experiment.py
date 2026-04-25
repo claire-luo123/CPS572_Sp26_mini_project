@@ -113,10 +113,15 @@ def extract_headline_scores(submission: Dict[str, Any]) -> Dict[str, Optional[fl
         "ifeval_score": pick_metric(
             ifeval_metrics,
             [
+                "final_acc",
                 "prompt_level_strict",
+                "prompt_strict",
                 "prompt_level_loose",
+                "prompt_loose",
                 "inst_level_strict",
+                "inst_strict",
                 "inst_level_loose",
+                "inst_loose",
                 "accuracy",
                 "acc",
             ],
@@ -183,6 +188,7 @@ def write_markdown_report(path: Path, report: Dict[str, Any]) -> None:
         f"- **Name:** {best['name']}",
         f"- **Step:** {best['step']}",
         f"- **Path:** `{best['path']}`",
+        f"- **State path (for GRPO):** `{best.get('state_path') or '(not saved)'}`",
         "",
         "## Top Checkpoints Full Evaluations",
         "",
@@ -230,7 +236,8 @@ def write_text_summary(path: Path, report: Dict[str, Any]) -> None:
         "Best checkpoint:",
         f"  Name: {best['name']}",
         f"  Step: {best['step']}",
-        f"  Path: {best['path']}",
+        f"  Path:       {best['path']}",
+        f"  State path: {best.get('state_path') or '(none - not loadable for GRPO)'}",
         "",
         "Best checkpoint full-eval scores:",
         f"  IFEval:   {format_score(final_scores['ifeval_score'])}",
@@ -337,6 +344,15 @@ def main() -> None:
         help="Sample limit per task when ranking checkpoints (30 fast; 50 if IFEval ranking is noisy)",
     )
     parser.add_argument(
+        "--quick_eval_sample_shuffle_seed",
+        type=int,
+        default=None,
+        help=(
+            "If set, passed to eval_all.py as --sample_shuffle_seed for quick eval only: "
+            "Inspect shuffles sample order before the limit, same seed for every checkpoint (reproducible)."
+        ),
+    )
+    parser.add_argument(
         "--final_eval_limit",
         type=int,
         default=None,
@@ -355,6 +371,29 @@ def main() -> None:
         action="store_true",
         help="Publish only the selected best checkpoint at the end",
     )
+    parser.add_argument(
+        "--use_cosine_lr",
+        dest="use_cosine_lr",
+        action="store_true",
+        help="Use cosine LR schedule with linear warmup (default).",
+    )
+    parser.add_argument(
+        "--no_cosine_lr",
+        dest="use_cosine_lr",
+        action="store_false",
+        help="Use constant LR (legacy).",
+    )
+    parser.add_argument("--lr_warmup_frac", type=float, default=0.05)
+    parser.add_argument("--lr_min_frac", type=float, default=0.1)
+    parser.add_argument(
+        "--stage2_fraction",
+        type=float,
+        default=0.0,
+        help="Two-stage curriculum: fraction of FINAL steps that sample IFEval-heavy batches "
+             "(0.25 = last 25%%). 0.0 disables.",
+    )
+    parser.add_argument("--stage2_if_weight", type=float, default=0.8)
+    parser.set_defaults(use_cosine_lr=True)
     args = parser.parse_args()
 
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -393,7 +432,19 @@ def main() -> None:
             "--model",
             args.model,
             "--no_publish",
+            "--lr_warmup_frac",
+            str(args.lr_warmup_frac),
+            "--lr_min_frac",
+            str(args.lr_min_frac),
+            "--stage2_fraction",
+            str(args.stage2_fraction),
+            "--stage2_if_weight",
+            str(args.stage2_if_weight),
         ]
+        if args.use_cosine_lr:
+            train_cmd.append("--use_cosine_lr")
+        else:
+            train_cmd.append("--no_cosine_lr")
         if args.train_data_path:
             train_cmd.extend(["--data_path", args.train_data_path])
         run_cmd(train_cmd, cwd=REPO_ROOT)
@@ -412,6 +463,11 @@ def main() -> None:
     from evaluation.eval_all import run_core
 
     print("\nEvaluating baseline (base model, no checkpoint)...")
+    baseline_shuffle = (
+        args.quick_eval_sample_shuffle_seed
+        if args.final_eval_limit is not None and args.quick_eval_sample_shuffle_seed is not None
+        else None
+    )
     baseline_metrics, baseline_task_results = asyncio.run(
         run_core(
             base_model=base_model,
@@ -422,6 +478,7 @@ def main() -> None:
             limit=args.final_eval_limit,
             log_dir=str(run_dir / "inspect_logs_baseline"),
             verbose=False,
+            sample_shuffle_seed=baseline_shuffle,
         )
     )
     baseline_headline_scores = extract_scores_from_task_results(baseline_task_results)
@@ -440,8 +497,6 @@ def main() -> None:
             cp_path,
             "--base_model",
             base_model,
-            "--limit",
-            str(args.quick_eval_limit),
             "--temperature",
             str(args.temperature),
             "--top_p",
@@ -449,6 +504,12 @@ def main() -> None:
             "--output_path",
             str(quick_out),
         ]
+        if args.quick_eval_limit and args.quick_eval_limit > 0:
+            eval_cmd.extend(["--limit", str(args.quick_eval_limit)])
+        if args.quick_eval_sample_shuffle_seed is not None:
+            eval_cmd.extend(
+                ["--sample_shuffle_seed", str(args.quick_eval_sample_shuffle_seed)]
+            )
         run_cmd(eval_cmd, cwd=REPO_ROOT)
 
         quick_submission = read_json(quick_out)
@@ -464,6 +525,7 @@ def main() -> None:
             {
                 "checkpoint_name": cp_name,
                 "checkpoint_path": cp_path,
+                "state_path": cp.get("state_path"),
                 "step": cp.get("step"),
                 "headline_scores": headline_scores,
                 "average_score": avg_score,
@@ -515,6 +577,7 @@ def main() -> None:
                 "rank": i,
                 "name": cp_name,
                 "path": cp_path,
+                "state_path": row.get("state_path"),
                 "step": row["step"],
                 "quick_headline_scores": row["headline_scores"],
                 "quick_average_score": row["average_score"],
@@ -557,6 +620,7 @@ def main() -> None:
     best = {
         "checkpoint_name": best_full["name"],
         "checkpoint_path": best_full["path"],
+        "state_path": best_full.get("state_path"),
         "step": best_full["step"],
         "headline_scores": best_full["quick_headline_scores"],
         "average_score": None,
@@ -591,9 +655,15 @@ def main() -> None:
             "rank": args.rank,
             "checkpoint_name": args.checkpoint_name,
             "checkpoint_every": args.checkpoint_every,
+            "use_cosine_lr": args.use_cosine_lr,
+            "lr_warmup_frac": args.lr_warmup_frac,
+            "lr_min_frac": args.lr_min_frac,
+            "stage2_fraction": args.stage2_fraction,
+            "stage2_if_weight": args.stage2_if_weight,
         },
         "eval_args": {
             "quick_eval_limit": args.quick_eval_limit,
+            "quick_eval_sample_shuffle_seed": args.quick_eval_sample_shuffle_seed,
             "final_eval_limit": args.final_eval_limit,
             "temperature": args.temperature,
             "top_p": args.top_p,
@@ -608,6 +678,7 @@ def main() -> None:
         "best_checkpoint": {
             "name": best_full["name"],
             "path": best_full["path"],
+            "state_path": best_full.get("state_path"),
             "step": best_full["step"],
             "quick_headline_scores": best_full["quick_headline_scores"],
             "quick_average_score": best_full["quick_average_score"],

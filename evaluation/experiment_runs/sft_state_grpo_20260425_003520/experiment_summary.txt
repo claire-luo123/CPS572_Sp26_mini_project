@@ -1,0 +1,33 @@
+EXPERIMENT SUMMARY
+Run timestamp (UTC): 2026-04-25T05:11:34.918678Z
+Base model: meta-llama/Llama-3.1-8B
+Training steps: 400
+Checkpoint cadence: every 50 steps
+
+Baseline scores:
+  IFEval:   0.2225
+  GSM8K:    0.1001
+  HumanEval:0.0000
+
+Best checkpoint:
+  Name: v4_with_state_step_400
+  Step: 400
+  Path:       tinker://3d1619c2-fea4-576b-8b6d-5b3f8cfa38d9:train:0/sampler_weights/v4_with_state_step_400
+  State path: tinker://3d1619c2-fea4-576b-8b6d-5b3f8cfa38d9:train:0/weights/v4_with_state_step_400
+
+Best checkpoint full-eval scores:
+  IFEval:   0.5300
+  GSM8K:    0.6103
+  HumanEval:0.4573
+
+Checkpoint candidates (quick eval):
+  - v4_with_state_step_100 (step 100): IFEval=0.5449, GSM8K=0.6000, HumanEval=0.4500, Avg=0.5316
+  - v4_with_state_step_400 (step 400): IFEval=0.5406, GSM8K=0.5750, HumanEval=0.4625, Avg=0.5260
+  - v4_with_state_step_300 (step 300): IFEval=0.5291, GSM8K=0.5875, HumanEval=0.4500, Avg=0.5222
+
+Top checkpoint full-eval scores:
+  - v4_with_state_step_100 (step 100): IFEval=0.5222, GSM8K=0.5193, HumanEval=0.4512
+  - v4_with_state_step_400 (step 400): IFEval=0.5300, GSM8K=0.6103, HumanEval=0.4573
+
+Report JSON: /Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/evaluation/experiment_runs/sft_state_grpo_20260425_003520/experiment_report.json
+Report Markdown: /Users/kevin/Desktop/CS 572/CPS572_Sp26_mini_project/evaluation/experiment_runs/sft_state_grpo_20260425_003520/experiment_report.md

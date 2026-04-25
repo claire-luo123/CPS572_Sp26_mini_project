@@ -72,8 +72,17 @@ def assert_eval_environment_ok():
             + fix_cmd
         )
 
-async def run_core(base_model, checkpoint_path, renderer_name, temperature,
-                   top_p, limit, log_dir, verbose):
+async def run_core(
+    base_model,
+    checkpoint_path,
+    renderer_name,
+    temperature,
+    top_p,
+    limit,
+    log_dir,
+    verbose,
+    sample_shuffle_seed=None,
+):
     """Run core 3 tasks for a single model/checkpoint. Returns (all_metrics, task_results)."""
     if not renderer_name:
         renderer_name = get_recommended_renderer_name(base_model)
@@ -85,9 +94,16 @@ async def run_core(base_model, checkpoint_path, renderer_name, temperature,
     task_results = {}
 
     task_args = dict(
-        checkpoint_path=checkpoint_path, base_model=base_model,
-        renderer_name=renderer_name, temperature=temperature, top_p=top_p,
-        max_tokens=1024, limit=limit, log_dir=log_dir, verbose=verbose,
+        checkpoint_path=checkpoint_path,
+        base_model=base_model,
+        renderer_name=renderer_name,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=1024,
+        limit=limit,
+        log_dir=log_dir,
+        verbose=verbose,
+        sample_shuffle_seed=sample_shuffle_seed,
     )
 
     # 1. IFEval
@@ -196,6 +212,12 @@ def main():
     p.add_argument("--top_p", type=float, default=1.0,
                     help="Top-p (nucleus) sampling (default: 1.0 = disabled)")
     p.add_argument("--limit", type=int, default=None, help="Max samples per task")
+    p.add_argument(
+        "--sample_shuffle_seed",
+        type=int,
+        default=None,
+        help="Inspect AI: shuffle sample order before --limit on each task (int seed; same seed = reproducible)",
+    )
     p.add_argument("--output_path", type=str, default=None,
                     help="Path for submission JSON (default: evaluation/submission.json)")
     p.add_argument("--log_dir", type=str, default=None)
@@ -207,23 +229,29 @@ def main():
 
     if args.checkpoint_path:
         # Checkpoint mode: evaluate one checkpoint, save submission.json
-        metrics, task_results = asyncio.run(run_core(
-            base_model=args.base_model,
-            checkpoint_path=args.checkpoint_path,
-            renderer_name=args.renderer_name,
-            temperature=args.temperature,
-            top_p=args.top_p,
-            limit=args.limit,
-            log_dir=args.log_dir,
-            verbose=args.verbose,
-        ))
+        metrics, task_results = asyncio.run(
+            run_core(
+                base_model=args.base_model,
+                checkpoint_path=args.checkpoint_path,
+                renderer_name=args.renderer_name,
+                temperature=args.temperature,
+                top_p=args.top_p,
+                limit=args.limit,
+                log_dir=args.log_dir,
+                verbose=args.verbose,
+                sample_shuffle_seed=args.sample_shuffle_seed,
+            )
+        )
+        settings = {
+            "temperature": args.temperature,
+            "top_p": args.top_p,
+        }
+        if args.sample_shuffle_seed is not None:
+            settings["sample_shuffle_seed"] = args.sample_shuffle_seed
         submission = {
             "checkpoint_path": args.checkpoint_path,
             "base_model": args.base_model,
-            "settings": {
-                "temperature": args.temperature,
-                "top_p": args.top_p,
-            },
+            "settings": settings,
             **task_results,
         }
         out_path = args.output_path or os.path.join(EVAL_DIR, "submission.json")
@@ -244,16 +272,19 @@ def main():
                 print("\n" + "#" * 60)
                 print(f"# BASELINE (core): {model}")
                 print("#" * 60)
-                metrics, _ = asyncio.run(run_core(
-                    base_model=model,
-                    checkpoint_path=None,
-                    renderer_name=None,
-                    temperature=args.temperature,
-                    top_p=args.top_p,
-                    limit=args.limit,
-                    log_dir=args.log_dir,
-                    verbose=args.verbose,
-                ))
+                metrics, _ = asyncio.run(
+                    run_core(
+                        base_model=model,
+                        checkpoint_path=None,
+                        renderer_name=None,
+                        temperature=args.temperature,
+                        top_p=args.top_p,
+                        limit=args.limit,
+                        log_dir=args.log_dir,
+                        verbose=args.verbose,
+                        sample_shuffle_seed=args.sample_shuffle_seed,
+                    )
+                )
                 if args.limit is None:
                     core_baselines[model] = metrics
                     save_json(core_path, {"type": "baseline", "models": core_baselines})

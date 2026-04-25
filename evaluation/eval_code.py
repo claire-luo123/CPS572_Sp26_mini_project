@@ -57,7 +57,7 @@ async def run(args):
     )
 
     log_dir = args.log_dir or os.path.join(EVAL_DIR, "inspect-logs")
-    results = await eval_async(
+    eval_kw = dict(
         tasks=[TASK],
         model=[model],
         limit=args.limit,
@@ -68,6 +68,9 @@ async def run(args):
         log_dir=log_dir,
         max_connections=512,
     )
+    if getattr(args, "sample_shuffle_seed", None) is not None:
+        eval_kw["sample_shuffle"] = int(args.sample_shuffle_seed)
+    results = await eval_async(**eval_kw)
 
     # Extract aggregate metrics
     metrics = {}
@@ -107,6 +110,12 @@ def main():
     p.add_argument("--top_p", type=float, default=1.0)
     p.add_argument("--max_tokens", type=int, default=1024)
     p.add_argument("--limit", type=int, default=None, help="Max samples (None=all 164)")
+    p.add_argument(
+        "--sample_shuffle_seed",
+        type=int,
+        default=None,
+        help="Inspect AI eval: shuffle sample order before --limit (int seed = reproducible)",
+    )
     p.add_argument("--log_dir", type=str, default=None)
     p.add_argument("--verbose", action="store_true")
     result = asyncio.run(run(p.parse_args()))
